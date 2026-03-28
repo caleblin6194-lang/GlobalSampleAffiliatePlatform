@@ -560,3 +560,268 @@ drop trigger if exists on_order_paid_generate_commission on public.orders;
 create trigger on_order_paid_generate_commission
   after update of status on public.orders
   for each row execute procedure public.generate_commission_on_order_paid();
+
+-- ============================================================
+-- ROUND 5: Vendor Fulfillment & Shipments
+-- ============================================================
+
+-- ============================================================
+-- FULFILLMENT ORDERS
+-- ============================================================
+create table if not exists public.fulfillment_orders (
+  id uuid default uuid_generate_v4() primary key,
+  order_id uuid references public.orders(id) on delete set null,
+  application_id uuid references public.campaign_applications(id) on delete set null,
+  task_id uuid references public.creator_tasks(id) on delete set null,
+  campaign_id uuid references public.campaigns(id) on delete set null,
+  merchant_id uuid references public.profiles(id) on delete set null,
+  vendor_id uuid references public.vendors(id) on delete set null,
+  creator_id uuid references public.profiles(id) on delete set null,
+  order_type text not null check (order_type in ('sample', 'sales')),
+  customer_name text,
+  phone text,
+  country text,
+  state text,
+  city text,
+  address_line1 text,
+  address_line2 text,
+  postal_code text,
+  status text default 'pending_pick' check (status in ('pending_pick', 'picking', 'packed', 'shipped', 'delivered', 'cancelled')),
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists idx_fulfillment_orders_vendor_id on public.fulfillment_orders(vendor_id);
+create index if not exists idx_fulfillment_orders_order_id on public.fulfillment_orders(order_id);
+create index if not exists idx_fulfillment_orders_application_id on public.fulfillment_orders(application_id);
+create index if not exists idx_fulfillment_orders_status on public.fulfillment_orders(status);
+create index if not exists idx_fulfillment_orders_merchant_id on public.fulfillment_orders(merchant_id);
+
+-- Auto-update updated_at
+drop trigger if exists on_fulfillment_updated on public.fulfillment_orders;
+create trigger on_fulfillment_updated
+  before update on public.fulfillment_orders
+  for each row execute procedure public.update_updated_at();
+
+alter table public.fulfillment_orders enable row level security;
+
+-- Vendors can view and manage their assigned orders
+create policy "Vendors can view own fulfillment orders" on public.fulfillment_orders
+  for select to authenticated using (auth.uid() = vendor_id);
+
+create policy "Vendors can update own fulfillment orders" on public.fulfillment_orders
+  for update to authenticated using (auth.uid() = vendor_id);
+
+-- Merchants can view their campaign fulfillment orders
+create policy "Merchants can view fulfillment orders for their campaigns" on public.fulfillment_orders
+  for select to authenticated
+  using (
+    exists (
+      select 1 from public.campaigns c
+      where c.id = campaign_id and c.merchant_id = auth.uid()
+    )
+  );
+
+-- Creators can view fulfillment orders for their applications
+create policy "Creators can view fulfillment orders for own applications" on public.fulfillment_orders
+  for select to authenticated using (auth.uid() = creator_id);
+
+-- Admin can manage all
+create policy "Admin can manage all fulfillment orders" on public.fulfillment_orders
+  for all to authenticated
+  using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+-- ============================================================
+-- SHIPMENTS
+-- ============================================================
+create table if not exists public.shipments (
+  id uuid default uuid_generate_v4() primary key,
+  fulfillment_order_id uuid references public.fulfillment_orders(id) on delete cascade,
+  carrier text not null,
+  tracking_no text not null,
+  shipped_at timestamptz default now(),
+  delivered_at timestamptz,
+  status text default 'in_transit' check (status in ('in_transit', 'delivered', 'exception')),
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists idx_shipments_fulfillment_order_id on public.shipments(fulfillment_order_id);
+create index if not exists idx_shipments_tracking_no on public.shipments(tracking_no);
+
+-- Auto-update updated_at
+drop trigger if exists on_shipment_updated on public.shipments;
+create trigger on_shipment_updated
+  before update on public.shipments
+  for each row execute procedure public.update_updated_at();
+
+alter table public.shipments enable row level security;
+
+-- Vendors can manage their shipments
+create policy "Vendors can manage own shipments" on public.shipments
+  for all to authenticated
+  using (
+    exists (
+      select 1 from public.fulfillment_orders fo
+      where fo.id = fulfillment_order_id and fo.vendor_id = auth.uid()
+    )
+  );
+
+-- Merchants can view shipments for their orders
+create policy "Merchants can view shipments for their campaigns" on public.shipments
+  for select to authenticated
+  using (
+    exists (
+      select 1 from public.fulfillment_orders fo
+      join public.campaigns c on fo.campaign_id = c.id
+      where fo.id = fulfillment_order_id and c.merchant_id = auth.uid()
+    )
+  );
+
+-- Admin can manage all
+create policy "Admin can manage all shipments" on public.shipments
+  for all to authenticated
+  using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+-- ============================================================
+-- AUTO FULFILLMENT GENERATION TRIGGERS
+-- ============================================================
+
+-- Trigger: Create sample fulfillment when application is approved
+create or replace function public.create_sample_fulfillment_on_approved()
+returns trigger as $$
+declare
+  v_product record;
+  v_vendor_id uuid;
+  v_fulfillment_exists boolean;
+begin
+  -- Only proceed if status changed TO approved
+  if new.status = 'approved' and old.status = 'pending' then
+    -- Check if fulfillment already exists
+    select exists(
+      select 1 from public.fulfillment_orders where application_id = new.id
+    ) into v_fulfillment_exists;
+
+    if not v_fulfillment_exists then
+      -- Get product and vendor
+      select p.vendor_id, p.id, p.title into v_product
+      from public.products p
+      join public.campaigns c on c.product_id = p.id
+      where c.id = new.campaign_id;
+
+      v_vendor_id := v_product.vendor_id;
+
+      -- Create sample fulfillment order
+      insert into public.fulfillment_orders (
+        application_id,
+        task_id,
+        campaign_id,
+        merchant_id,
+        vendor_id,
+        creator_id,
+        order_type,
+        customer_name,
+        phone,
+        country,
+        state,
+        city,
+        address_line1,
+        address_line2,
+        postal_code,
+        status
+      ) values (
+        new.id,
+        new.task_id,
+        new.campaign_id,
+        new.merchant_id,
+        v_vendor_id,
+        new.creator_id,
+        'sample',
+        new.shipping_name,
+        new.phone,
+        new.country,
+        new.state,
+        new.city,
+        new.address_line1,
+        new.address_line2,
+        new.postal_code,
+        'pending_pick'
+      );
+    end if;
+  end if;
+
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_application_approved_create_sample_fulfillment on public.campaign_applications;
+create trigger on_application_approved_create_sample_fulfillment
+  after update of status on public.campaign_applications
+  for each row execute procedure public.create_sample_fulfillment_on_approved();
+
+-- Trigger: Create sales fulfillment when order is paid
+create or replace function public.create_sales_fulfillment_on_paid()
+returns trigger as $$
+declare
+  v_product record;
+  v_vendor_id uuid;
+  v_fulfillment_exists boolean;
+begin
+  -- Only proceed if status changed TO paid
+  if new.status = 'paid' and old.status != 'paid' then
+    -- Check if fulfillment already exists
+    select exists(
+      select 1 from public.fulfillment_orders where order_id = new.id
+    ) into v_fulfillment_exists;
+
+    if not v_fulfillment_exists then
+      -- Get product from campaign and vendor from product
+      select p.vendor_id into v_vendor_id
+      from public.products p
+      join public.campaigns c on c.product_id = p.id
+      where c.id = new.campaign_id;
+
+      -- Create sales fulfillment order
+      insert into public.fulfillment_orders (
+        order_id,
+        campaign_id,
+        merchant_id,
+        vendor_id,
+        creator_id,
+        order_type,
+        customer_name,
+        phone,
+        country,
+        state,
+        city,
+        address_line1,
+        postal_code,
+        status
+      ) values (
+        new.id,
+        new.campaign_id,
+        (select merchant_id from public.campaigns where id = new.campaign_id),
+        v_vendor_id,
+        new.creator_id,
+        'sales',
+        new.customer_name,
+        new.customer_phone,
+        'N/A', -- Country not tracked in orders
+        'N/A', -- State
+        'N/A', -- City
+        coalesce(new.customer_email, 'N/A'),
+        'N/A'  -- Postal
+      );
+    end if;
+  end if;
+
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_order_paid_create_sales_fulfillment on public.orders;
+create trigger on_order_paid_create_sales_fulfillment
+  after update of status on public.orders
+  for each row execute procedure public.create_sales_fulfillment_on_paid();

@@ -579,6 +579,114 @@ export type Database = {
           updated_at?: string | null
         }
       }
+      // ========== ROUND 5 ==========
+      fulfillment_orders: {
+        Row: {
+          id: string
+          order_id: string | null
+          application_id: string | null
+          task_id: string | null
+          campaign_id: string | null
+          merchant_id: string | null
+          vendor_id: string | null
+          creator_id: string | null
+          order_type: string | null
+          customer_name: string | null
+          phone: string | null
+          country: string | null
+          state: string | null
+          city: string | null
+          address_line1: string | null
+          address_line2: string | null
+          postal_code: string | null
+          status: string | null
+          notes: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          order_id?: string | null
+          application_id?: string | null
+          task_id?: string | null
+          campaign_id?: string | null
+          merchant_id?: string | null
+          vendor_id?: string | null
+          creator_id?: string | null
+          order_type?: string
+          customer_name?: string | null
+          phone?: string | null
+          country?: string | null
+          state?: string | null
+          city?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
+          postal_code?: string | null
+          status?: string
+          notes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string | null
+          order_id?: string | null
+          application_id?: string | null
+          task_id?: string | null
+          campaign_id?: string | null
+          merchant_id?: string | null
+          vendor_id?: string | null
+          creator_id?: string | null
+          order_type?: string | null
+          customer_name?: string | null
+          phone?: string | null
+          country?: string | null
+          state?: string | null
+          city?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
+          postal_code?: string | null
+          status?: string | null
+          notes?: string | null
+          updated_at?: string | null
+        }
+      }
+      shipments: {
+        Row: {
+          id: string
+          fulfillment_order_id: string | null
+          carrier: string | null
+          tracking_no: string | null
+          shipped_at: string | null
+          delivered_at: string | null
+          status: string | null
+          notes: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          fulfillment_order_id?: string | null
+          carrier?: string
+          tracking_no?: string
+          shipped_at?: string | null
+          delivered_at?: string | null
+          status?: string
+          notes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string | null
+          fulfillment_order_id?: string | null
+          carrier?: string | null
+          tracking_no?: string | null
+          shipped_at?: string | null
+          delivered_at?: string | null
+          status?: string | null
+          notes?: string | null
+          updated_at?: string | null
+        }
+      }
     }
     Enums: {
       role: "admin" | "merchant" | "creator" | "vendor"

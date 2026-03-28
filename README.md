@@ -67,7 +67,7 @@ Find these values in Supabase Dashboard → Project Settings → API.
 In Supabase Dashboard → SQL Editor:
 
 1. Paste and run **`supabase/schema.sql`**
-2. This creates all tables, triggers, and RLS policies for Rounds 1-4:
+2. This creates all tables, triggers, and RLS policies for Rounds 1-5:
    - `profiles` — user profiles with roles
    - `brands` — merchant brand listings
    - `creator_channels` — creator social media channels
@@ -84,6 +84,8 @@ In Supabase Dashboard → SQL Editor:
    - `orders` — customer orders with attribution (Round 4)
    - `order_items` — items within orders (Round 4)
    - `commissions` — auto-generated commissions on paid orders (Round 4)
+   - `fulfillment_orders` — vendor fulfillment tracking (Round 5)
+   - `shipments` — shipping tracking records (Round 5)
 
 ### Step 3: Verify Triggers
 
@@ -95,6 +97,8 @@ After running schema.sql, verify these triggers exist:
    - **`on_application_updated`** on `campaign_applications`
    - **`on_application_approved_create_task`** on `campaign_applications` (Round 3)
    - **`on_order_paid_generate_commission`** on `orders` (Round 4)
+   - **`on_application_approved_create_sample_fulfillment`** on `campaign_applications` (Round 5)
+   - **`on_order_paid_create_sales_fulfillment`** on `orders` (Round 5)
 
 ### Step 4: (Optional) Load Demo Data
 
@@ -126,7 +130,7 @@ All demo accounts use password: `Demo1234!`
 | `admin` | `/admin/dashboard` | Platform administration |
 | `merchant` | `/merchant/dashboard` | Brand & campaign management |
 | `creator` | `/creator/dashboard` | Content creator sampling requests |
-| `vendor` | `/vendor/dashboard` | Supplier vendor product & inventory management |
+| `vendor` | `/vendor/dashboard` | Supplier vendor product & fulfillment |
 
 ---
 
@@ -151,9 +155,8 @@ All demo accounts use password: `Demo1234!`
 - **Content submission** — Creators submit content links with disclosure
 - **Merchant content review** — Merchants approve/reject content
 - **Status linkage** — Task and content status stay in sync
-- **Admin dashboard** — Content statistics added
 
-### Round 4 (Affiliate & Commissions) ⭐ Current
+### Round 4 (Affiliate & Commissions) ⭐
 - **Affiliate links** — Unique tracking links per creator per campaign
 - **Coupon codes** — Discount codes (creator-specific or general)
 - **Click tracking** — `/track/[code]` records clicks then redirects
@@ -161,6 +164,15 @@ All demo accounts use password: `Demo1234!`
 - **Auto-commission** — Paid orders generate commissions automatically
 - **Merchant analytics** — Campaign-level clicks, orders, conversion rate
 - **Creator earnings** — Dashboard showing links, clicks, commissions
+
+### Round 5 (Vendor Fulfillment) ⭐ Current
+- **Fulfillment orders** — Sample and sales order fulfillment tracking
+- **Auto-fulfillment** — Sample fulfillment auto-created on application approval
+- **Sales fulfillment** — Auto-created when order is marked paid
+- **Vendor workflow** — Pick → Pack → Ship with tracking numbers
+- **Barcode display** — Clear barcode codes shown for warehouse picking
+- **Merchant view** — Track fulfillment status across vendors
+- **Shipment tracking** — Carrier and tracking number records
 
 ---
 
@@ -178,20 +190,60 @@ src/
 │   │   ├── merchant/
 │   │   │   ├── content/       # Round 3: Content review
 │   │   │   ├── orders/        # Round 4: Order management
-│   │   │   └── analytics/     # Round 4: Campaign analytics
+│   │   │   ├── analytics/     # Round 4: Campaign analytics
+│   │   │   └── fulfillment/   # Round 5: Fulfillment tracking
 │   │   └── vendor/
+│   │       ├── orders/       # Round 5: Fulfillment orders
+│   │       └── shipments/     # Round 5: Shipment tracking
 │   ├── api/              # API routes
-│   │   ├── tasks/       # Round 3: Task APIs
-│   │   ├── content/      # Round 3: Content APIs
-│   │   ├── earnings/     # Round 4: Creator earnings API
-│   │   ├── orders/       # Round 4: Order CRUD
-│   │   ├── analytics/    # Round 4: Merchant analytics
-│   │   └── track/        # Round 4: Click tracking
 │   └── track/[code]/    # Round 4: Public tracking landing
 └── components/
     ├── dashboard/        # Shared dashboard components
     └── ui/               # shadcn/ui components
 ```
+
+---
+
+## Workflow Summary
+
+### Complete Creator Flow
+1. Creator applies to campaign → `/creator/campaigns/[id]/apply`
+2. Merchant approves → Task auto-created → Sample fulfillment auto-created
+3. Creator submits content → `/creator/tasks/[id]`
+4. Merchant reviews content → `/merchant/content/[id]`
+5. Creator promotes with affiliate link → `/creator/earnings`
+6. Clicks tracked → `/track/[code]`
+7. Orders attributed → Commission auto-generated
+8. **NEW:** Sample shipped by vendor → Creator sees fulfillment status
+
+### Complete Merchant Flow
+1. Create campaign → `/merchant/campaigns/new`
+2. Review applications → `/merchant/applications`
+3. Review content → `/merchant/content/[id]`
+4. Create simulated order → `/merchant/orders/new`
+5. Mark order paid → Commission auto-generated + Sales fulfillment created
+6. View analytics → `/merchant/analytics`
+7. **NEW:** Track fulfillment → `/merchant/fulfillment`
+
+### Complete Vendor Flow (Round 5)
+1. View assigned orders → `/vendor/orders`
+2. See barcode and address → `/vendor/orders/[id]`
+3. Update status: pending_pick → picking → packed
+4. Enter carrier + tracking → Ship → Shipment created
+5. View shipments → `/vendor/shipments`
+
+---
+
+## What's NOT in This Version
+
+The following are intentionally not implemented:
+
+- **Stripe / PayPal payments** — Order simulation only
+- **Payouts** — No actual fund transfers
+- **Real barcode scanning hardware** — UI display only
+- **File uploads** — URL-based content only
+- **Email notifications** — Manual updates only
+- **Multi-language** — English only
 
 ---
 
@@ -207,37 +259,3 @@ npm run lint
 # Build for production
 npm run build
 ```
-
----
-
-## What's NOT in This Version
-
-The following are intentionally not implemented to keep the scope focused:
-
-- **Stripe / PayPal payments** — Order simulation only
-- **Payouts** — No actual fund transfers
-- **Vendor fulfillment** — No shipment tracking
-- **File uploads** — URL-based content only
-- **Email notifications** — Manual updates only
-- **Multi-language** — English only
-
----
-
-## Workflow Summary
-
-### Complete Creator Flow
-1. Creator applies to campaign → `/creator/campaigns/[id]/apply`
-2. Merchant approves → Task auto-created → `/creator/tasks`
-3. Creator submits content → `/creator/tasks/[id]`
-4. Merchant reviews content → `/merchant/content/[id]`
-5. **NEW:** Creator promotes with affiliate link → `/creator/earnings`
-6. **NEW:** Clicks tracked → `/track/[code]`
-7. **NEW:** Orders attributed → Commission auto-generated
-
-### Complete Merchant Flow
-1. Create campaign → `/merchant/campaigns/new`
-2. Review applications → `/merchant/applications`
-3. Review content → `/merchant/content/[id]`
-4. **NEW:** Create simulated order → `/merchant/orders/new`
-5. **NEW:** Mark order paid → Commission auto-generated
-6. **NEW:** View analytics → `/merchant/analytics`
