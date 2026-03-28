@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { LayoutDashboard, ShoppingBag, Users, Package, Megaphone, BarChart3, Menu, Store, Video, CheckCircle, FileText, ClipboardList, DollarSign, ShoppingCart, MousePointer, Truck } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Users, Package, Megaphone, BarChart3, Menu, Store, Video, User, CheckCircle, FileText, ClipboardList, DollarSign, Link2, ShoppingCart, MousePointer, Truck, PackageCheck } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 interface NavItem {
@@ -29,8 +29,8 @@ const roleNavItems: Record<string, NavItem[]> = {
     { label: "Applications", href: "/merchant/applications", icon: CheckCircle },
     { label: "Content Review", href: "/merchant/content", icon: FileText },
     { label: "Orders", href: "/merchant/orders", icon: ShoppingCart },
-    { label: "Analytics", href: "/merchant/analytics", icon: BarChart3 },
     { label: "Fulfillment", href: "/merchant/fulfillment", icon: Truck },
+    { label: "Analytics", href: "/merchant/analytics", icon: BarChart3 },
   ],
   creator: [
     { label: "Dashboard", href: "/creator/dashboard", icon: LayoutDashboard },
@@ -43,9 +43,9 @@ const roleNavItems: Record<string, NavItem[]> = {
   ],
   vendor: [
     { label: "Dashboard", href: "/vendor/dashboard", icon: LayoutDashboard },
-    { label: "Orders", href: "/vendor/orders", icon: Package },
+    { label: "Orders", href: "/vendor/orders", icon: PackageCheck },
     { label: "Shipments", href: "/vendor/shipments", icon: Truck },
-    { label: "Products", href: "/vendor/products", icon: ShoppingBag },
+    { label: "Products", href: "/vendor/products", icon: Package },
     { label: "Inventory", href: "/vendor/inventory", icon: BarChart3 },
   ],
 };
