@@ -67,7 +67,7 @@ Find these values in Supabase Dashboard → Project Settings → API.
 In Supabase Dashboard → SQL Editor:
 
 1. Paste and run **`supabase/schema.sql`**
-2. This creates all tables, triggers, and RLS policies for Round 1-3:
+2. This creates all tables, triggers, and RLS policies for Rounds 1-4:
    - `profiles` — user profiles with roles
    - `brands` — merchant brand listings
    - `creator_channels` — creator social media channels
@@ -75,9 +75,15 @@ In Supabase Dashboard → SQL Editor:
    - `products` — product catalog
    - `product_variants` — product variants with auto-generated barcodes
    - `campaigns` — sampling campaigns
-   - `campaign_applications` — creator applications to campaigns (Round 2)
+   - `campaign_applications` — creator applications (Round 2)
    - `creator_tasks` — tasks auto-generated when application approved (Round 3)
    - `creator_contents` — content submitted by creators (Round 3)
+   - `affiliate_links` — unique tracking links per creator per campaign (Round 4)
+   - `coupon_codes` — discount codes (Round 4)
+   - `clicks` — click tracking records (Round 4)
+   - `orders` — customer orders with attribution (Round 4)
+   - `order_items` — items within orders (Round 4)
+   - `commissions` — auto-generated commissions on paid orders (Round 4)
 
 ### Step 3: Verify Triggers
 
@@ -87,7 +93,8 @@ After running schema.sql, verify these triggers exist:
 2. You should see:
    - **`on_auth_user_created`** on `auth.users`
    - **`on_application_updated`** on `campaign_applications`
-   - **`on_application_approved_create_task`** on `campaign_applications`
+   - **`on_application_approved_create_task`** on `campaign_applications` (Round 3)
+   - **`on_order_paid_generate_commission`** on `orders` (Round 4)
 
 ### Step 4: (Optional) Load Demo Data
 
@@ -123,69 +130,7 @@ All demo accounts use password: `Demo1234!`
 
 ---
 
-## Round 3: Content Workflow (Task → Content → Review)
-
-The complete workflow: Application Approved → Task Created → Creator Submits Content → Merchant Reviews
-
-### Creator Flow
-1. Creator applies to a campaign → `/creator/campaigns/[id]/apply`
-2. Merchant approves application → `/merchant/applications`
-3. **Task automatically created** → `/creator/tasks`
-4. Creator views task details → `/creator/tasks/[id]`
-5. Creator submits content link → `/creator/tasks/[id]`
-6. Creator tracks status → `/creator/tasks`
-
-### Merchant Flow
-1. Merchant views applications → `/merchant/applications`
-2. Merchant approves application → Task auto-created
-3. **Merchant reviews content** → `/merchant/content`
-4. Merchant approves/rejects → `/merchant/content/[id]`
-
----
-
-## Project Structure
-
-```
-src/
-├── app/
-│   ├── (auth)/           # Auth pages (login, register)
-│   ├── (dashboard)/      # Role-based dashboards
-│   │   ├── admin/
-│   │   ├── creator/
-│   │   │   ├── tasks/         # Round 3: Task list & detail
-│   │   │   └── ...
-│   │   ├── merchant/
-│   │   │   ├── content/       # Round 3: Content review
-│   │   │   └── ...
-│   │   └── vendor/
-│   └── api/              # API routes
-│       ├── tasks/       # Round 3: Task APIs
-│       └── content/      # Round 3: Content APIs
-├── components/
-│   ├── dashboard/        # Shared dashboard components
-│   └── ui/               # shadcn/ui components
-└── lib/
-    └── supabase/         # Supabase client setup
-```
-
----
-
-## Development
-
-```bash
-# Run type checking
-npm run type-check
-
-# Run linting
-npm run lint
-
-# Build for production
-npm run build
-```
-
----
-
-## Features
+## Feature Rounds
 
 ### Round 1 (Foundation)
 - **Multi-role authentication** — Admin, Merchant, Creator, Vendor
@@ -208,19 +153,91 @@ npm run build
 - **Status linkage** — Task and content status stay in sync
 - **Admin dashboard** — Content statistics added
 
+### Round 4 (Affiliate & Commissions) ⭐ Current
+- **Affiliate links** — Unique tracking links per creator per campaign
+- **Coupon codes** — Discount codes (creator-specific or general)
+- **Click tracking** — `/track/[code]` records clicks then redirects
+- **Order attribution** — Orders linked to creator via link or coupon
+- **Auto-commission** — Paid orders generate commissions automatically
+- **Merchant analytics** — Campaign-level clicks, orders, conversion rate
+- **Creator earnings** — Dashboard showing links, clicks, commissions
+
 ---
 
-## What's NOT in This Version (Round 3)
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── (auth)/           # Auth pages (login, register)
+│   ├── (dashboard)/      # Role-based dashboards
+│   │   ├── admin/
+│   │   ├── creator/
+│   │   │   ├── tasks/         # Round 3: Task list & detail
+│   │   │   └── earnings/      # Round 4: Earnings dashboard
+│   │   ├── merchant/
+│   │   │   ├── content/       # Round 3: Content review
+│   │   │   ├── orders/        # Round 4: Order management
+│   │   │   └── analytics/     # Round 4: Campaign analytics
+│   │   └── vendor/
+│   ├── api/              # API routes
+│   │   ├── tasks/       # Round 3: Task APIs
+│   │   ├── content/      # Round 3: Content APIs
+│   │   ├── earnings/     # Round 4: Creator earnings API
+│   │   ├── orders/       # Round 4: Order CRUD
+│   │   ├── analytics/    # Round 4: Merchant analytics
+│   │   └── track/        # Round 4: Click tracking
+│   └── track/[code]/    # Round 4: Public tracking landing
+└── components/
+    ├── dashboard/        # Shared dashboard components
+    └── ui/               # shadcn/ui components
+```
+
+---
+
+## Development
+
+```bash
+# Run type checking
+npm run type-check
+
+# Run linting
+npm run lint
+
+# Build for production
+npm run build
+```
+
+---
+
+## What's NOT in This Version
 
 The following are intentionally not implemented to keep the scope focused:
 
-- Affiliate links / referral tracking
-- Coupon codes
-- Click tracking
-- Order attribution
-- Commission calculations
-- Payouts
-- Vendor fulfillment / shipment tracking
-- File upload storage (URL-based screenshot only)
-- Stripe payments
-- Email notifications
+- **Stripe / PayPal payments** — Order simulation only
+- **Payouts** — No actual fund transfers
+- **Vendor fulfillment** — No shipment tracking
+- **File uploads** — URL-based content only
+- **Email notifications** — Manual updates only
+- **Multi-language** — English only
+
+---
+
+## Workflow Summary
+
+### Complete Creator Flow
+1. Creator applies to campaign → `/creator/campaigns/[id]/apply`
+2. Merchant approves → Task auto-created → `/creator/tasks`
+3. Creator submits content → `/creator/tasks/[id]`
+4. Merchant reviews content → `/merchant/content/[id]`
+5. **NEW:** Creator promotes with affiliate link → `/creator/earnings`
+6. **NEW:** Clicks tracked → `/track/[code]`
+7. **NEW:** Orders attributed → Commission auto-generated
+
+### Complete Merchant Flow
+1. Create campaign → `/merchant/campaigns/new`
+2. Review applications → `/merchant/applications`
+3. Review content → `/merchant/content/[id]`
+4. **NEW:** Create simulated order → `/merchant/orders/new`
+5. **NEW:** Mark order paid → Commission auto-generated
+6. **NEW:** View analytics → `/merchant/analytics`

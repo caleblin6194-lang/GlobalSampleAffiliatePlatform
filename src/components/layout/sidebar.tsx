@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { LayoutDashboard, ShoppingBag, Users, Package, Megaphone, BarChart3, Menu, Store, Video, User, CheckCircle, FileText, ClipboardList } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Users, Package, Megaphone, BarChart3, Menu, Store, Video, User, CheckCircle, FileText, ClipboardList, DollarSign, Link2, ShoppingCart, MousePointer } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 interface NavItem {
@@ -28,12 +28,15 @@ const roleNavItems: Record<string, NavItem[]> = {
     { label: "Campaigns", href: "/merchant/campaigns", icon: Megaphone },
     { label: "Applications", href: "/merchant/applications", icon: CheckCircle },
     { label: "Content Review", href: "/merchant/content", icon: FileText },
+    { label: "Orders", href: "/merchant/orders", icon: ShoppingCart },
+    { label: "Analytics", href: "/merchant/analytics", icon: BarChart3 },
   ],
   creator: [
     { label: "Dashboard", href: "/creator/dashboard", icon: LayoutDashboard },
     { label: "Campaigns", href: "/creator/campaigns", icon: Megaphone },
     { label: "My Applications", href: "/creator/applications", icon: CheckCircle },
     { label: "My Tasks", href: "/creator/tasks", icon: ClipboardList },
+    { label: "Earnings", href: "/creator/earnings", icon: DollarSign },
     { label: "My Channels", href: "/creator/channels", icon: Video },
     { label: "Samples", href: "/creator/samples", icon: ShoppingBag },
   ],

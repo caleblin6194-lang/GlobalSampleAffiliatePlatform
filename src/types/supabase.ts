@@ -367,6 +367,218 @@ export type Database = {
           updated_at?: string | null
         }
       }
+      // ========== ROUND 4 ==========
+      affiliate_links: {
+        Row: {
+          id: string
+          creator_id: string | null
+          campaign_id: string | null
+          code: string
+          target_path: string | null
+          is_active: boolean | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          creator_id?: string | null
+          campaign_id?: string | null
+          code: string
+          target_path?: string | null
+          is_active?: boolean | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string | null
+          creator_id?: string | null
+          campaign_id?: string | null
+          code?: string
+          target_path?: string | null
+          is_active?: boolean | null
+          created_at?: string | null
+        }
+      }
+      coupon_codes: {
+        Row: {
+          id: string
+          creator_id: string | null
+          campaign_id: string | null
+          code: string
+          discount_type: string | null
+          discount_value: number | null
+          is_active: boolean | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          creator_id?: string | null
+          campaign_id?: string | null
+          code: string
+          discount_type?: string | null
+          discount_value?: number | null
+          is_active?: boolean | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string | null
+          creator_id?: string | null
+          campaign_id?: string | null
+          code?: string
+          discount_type?: string | null
+          discount_value?: number | null
+          is_active?: boolean | null
+          created_at?: string | null
+        }
+      }
+      clicks: {
+        Row: {
+          id: string
+          affiliate_link_id: string | null
+          creator_id: string | null
+          campaign_id: string | null
+          visitor_id: string | null
+          referrer: string | null
+          user_agent: string | null
+          ip_address: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          affiliate_link_id?: string | null
+          creator_id?: string | null
+          campaign_id?: string | null
+          visitor_id?: string | null
+          referrer?: string | null
+          user_agent?: string | null
+          ip_address?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string | null
+          affiliate_link_id?: string | null
+          creator_id?: string | null
+          campaign_id?: string | null
+          visitor_id?: string | null
+          referrer?: string | null
+          user_agent?: string | null
+          ip_address?: string | null
+          created_at?: string | null
+        }
+      }
+      orders: {
+        Row: {
+          id: string
+          campaign_id: string | null
+          creator_id: string | null
+          affiliate_link_id: string | null
+          coupon_code_id: string | null
+          customer_name: string | null
+          customer_email: string | null
+          customer_phone: string | null
+          amount: number | null
+          status: string | null
+          attribution_source: string | null
+          notes: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          campaign_id?: string | null
+          creator_id?: string | null
+          affiliate_link_id?: string | null
+          coupon_code_id?: string | null
+          customer_name?: string | null
+          customer_email?: string | null
+          customer_phone?: string | null
+          amount?: number | null
+          status?: string
+          attribution_source?: string
+          notes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string | null
+          campaign_id?: string | null
+          creator_id?: string | null
+          affiliate_link_id?: string | null
+          coupon_code_id?: string | null
+          customer_name?: string | null
+          customer_email?: string | null
+          customer_phone?: string | null
+          amount?: number | null
+          status?: string | null
+          attribution_source?: string | null
+          notes?: string | null
+          updated_at?: string | null
+        }
+      }
+      order_items: {
+        Row: {
+          id: string
+          order_id: string | null
+          product_id: string | null
+          variant_id: string | null
+          qty: number | null
+          unit_price: number | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          order_id?: string | null
+          product_id?: string | null
+          variant_id?: string | null
+          qty?: number | null
+          unit_price?: number | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string | null
+          order_id?: string | null
+          product_id?: string | null
+          variant_id?: string | null
+          qty?: number | null
+          unit_price?: number | null
+          created_at?: string | null
+        }
+      }
+      commissions: {
+        Row: {
+          id: string
+          order_id: string | null
+          creator_id: string | null
+          campaign_id: string | null
+          amount: number | null
+          rate: number | null
+          status: string | null
+          notes: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          order_id?: string | null
+          creator_id?: string | null
+          campaign_id?: string | null
+          amount?: number | null
+          rate?: number | null
+          status?: string
+          notes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string | null
+          order_id?: string | null
+          creator_id?: string | null
+          campaign_id?: string | null
+          amount?: number | null
+          rate?: number | null
+          status?: string | null
+          notes?: string | null
+          updated_at?: string | null
+        }
+      }
     }
     Enums: {
       role: "admin" | "merchant" | "creator" | "vendor"

@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, Store, Video, Package, FileText, Clock, CheckCircle, XCircle } from "lucide-react";
+import { Users, Store, Video, Package, FileText, Clock, CheckCircle, XCircle, MousePointer, ShoppingCart, DollarSign } from "lucide-react";
 
 export default async function AdminDashboard() {
   const supabase = await createClient();
@@ -63,6 +63,24 @@ export default async function AdminDashboard() {
     .select("*", { count: "exact", head: true })
     .eq("status", "rejected");
 
+  // Round 4: Affiliate stats
+  const { count: totalClicks } = await supabase
+    .from("clicks")
+    .select("*", { count: "exact", head: true });
+
+  const { count: totalOrders } = await supabase
+    .from("orders")
+    .select("*", { count: "exact", head: true });
+
+  const { count: paidOrders } = await supabase
+    .from("orders")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "paid");
+
+  const { count: totalCommissions } = await supabase
+    .from("commissions")
+    .select("*", { count: "exact", head: true });
+
   const { data: recentUsers } = await supabase
     .from("profiles")
     .select("full_name, email, role, created_at")
@@ -107,6 +125,14 @@ export default async function AdminDashboard() {
         <StatCard title="Pending Review" value={pendingContents || 0} icon={Clock} />
         <StatCard title="Approved" value={approvedContents || 0} icon={CheckCircle} />
         <StatCard title="Rejected" value={rejectedContents || 0} icon={XCircle} />
+      </div>
+
+      {/* Round 4: Affiliate Stats */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard title="Total Clicks" value={totalClicks || 0} icon={MousePointer} />
+        <StatCard title="Total Orders" value={totalOrders || 0} icon={ShoppingCart} />
+        <StatCard title="Paid Orders" value={paidOrders || 0} icon={CheckCircle} />
+        <StatCard title="Total Commissions" value={totalCommissions || 0} icon={DollarSign} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

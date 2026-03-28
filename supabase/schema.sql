@@ -210,3 +210,353 @@ drop trigger if exists on_application_approved_create_task on public.campaign_ap
 create trigger on_application_approved_create_task
   after update of status on public.campaign_applications
   for each row execute procedure public.create_task_on_application_approved();
+
+-- ============================================================
+-- ROUND 4: Affiliate Links, Coupons, Clicks, Orders, Commissions
+-- ============================================================
+
+-- ============================================================
+-- AFFILIATE LINKS
+-- ============================================================
+create table if not exists public.affiliate_links (
+  id uuid default uuid_generate_v4() primary key,
+  creator_id uuid references public.profiles(id) on delete cascade,
+  campaign_id uuid references public.campaigns(id) on delete cascade,
+  code text not null unique,
+  target_path text,
+  is_active boolean default true,
+  created_at timestamptz default now()
+);
+
+-- Each creator+campaign combo has unique code
+create unique index if not exists idx_affiliate_links_creator_campaign 
+  on public.affiliate_links(creator_id, campaign_id);
+
+alter table public.affiliate_links enable row level security;
+
+-- Creators manage their own links
+create policy "Creators manage own affiliate links" on public.affiliate_links
+  for all to authenticated using (auth.uid() = creator_id);
+
+-- Merchants can view links for their campaigns
+create policy "Merchants can view affiliate links for their campaigns" on public.affiliate_links
+  for select to authenticated
+  using (
+    exists (
+      select 1 from public.campaigns c
+      where c.id = campaign_id and c.merchant_id = auth.uid()
+    )
+  );
+
+-- Admin can read all
+create policy "Admin can read all affiliate links" on public.affiliate_links
+  for select to authenticated
+  using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+-- Public can access links by code (for /track/[code])
+create policy "Public can view active affiliate links by code" on public.affiliate_links
+  for select to authenticated using (is_active = true);
+
+-- ============================================================
+-- COUPON CODES
+-- ============================================================
+create table if not exists public.coupon_codes (
+  id uuid default uuid_generate_v4() primary key,
+  creator_id uuid references public.profiles(id) on delete set null,
+  campaign_id uuid references public.campaigns(id) on delete cascade,
+  code text not null,
+  discount_type text default 'percent' check (discount_type in ('percent', 'fixed')),
+  discount_value decimal(10,2) default 0,
+  is_active boolean default true,
+  created_at timestamptz default now()
+);
+
+-- Creator+campaign+code combo is unique
+create unique index if not exists idx_coupon_codes_creator_campaign_code 
+  on public.coupon_codes(creator_id, campaign_id, code);
+
+alter table public.coupon_codes enable row security;
+
+-- Creators can view their own coupons
+create policy "Creators can view own coupon codes" on public.coupon_codes
+  for select to authenticated using (auth.uid() = creator_id or creator_id is null);
+
+-- Creators can manage their own coupons
+create policy "Creators can manage own coupon codes" on public.coupon_codes
+  for all to authenticated using (auth.uid() = creator_id);
+
+-- Merchants can manage coupons for their campaigns
+create policy "Merchants can manage coupons for their campaigns" on public.coupon_codes
+  for all to authenticated
+  using (
+    exists (
+      select 1 from public.campaigns c
+      where c.id = campaign_id and c.merchant_id = auth.uid()
+    )
+  );
+
+-- Admin can read all
+create policy "Admin can read all coupon codes" on public.coupon_codes
+  for select to authenticated
+  using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+-- ============================================================
+-- CLICKS (Tracking)
+-- ============================================================
+create table if not exists public.clicks (
+  id uuid default uuid_generate_v4() primary key,
+  affiliate_link_id uuid references public.affiliate_links(id) on delete set null,
+  creator_id uuid references public.profiles(id) on delete set null,
+  campaign_id uuid references public.campaigns(id) on delete set null,
+  visitor_id text,
+  referrer text,
+  user_agent text,
+  ip_address text,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_clicks_affiliate_link_id on public.clicks(affiliate_link_id);
+create index if not exists idx_clicks_creator_id on public.clicks(creator_id);
+create index if not exists idx_clicks_campaign_id on public.clicks(campaign_id);
+create index if not exists idx_clicks_created_at on public.clicks(created_at);
+
+alter table public.clicks enable row level security;
+
+-- Anyone can record clicks (public access)
+create policy "Anyone can insert clicks" on public.clicks
+  for insert to authenticated with check (true);
+
+-- Public can insert clicks without auth (for tracking)
+-- Note: This allows anonymous tracking - adjust as needed
+
+-- Creators can view their own clicks
+create policy "Creators can view own clicks" on public.clicks
+  for select to authenticated using (auth.uid() = creator_id);
+
+-- Merchants can view clicks for their campaigns
+create policy "Merchants can view clicks for their campaigns" on public.clicks
+  for select to authenticated
+  using (
+    exists (
+      select 1 from public.campaigns c
+      where c.id = campaign_id and c.merchant_id = auth.uid()
+    )
+  );
+
+-- Admin can read all
+create policy "Admin can read all clicks" on public.clicks
+  for select to authenticated
+  using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+-- ============================================================
+-- ORDERS
+-- ============================================================
+create table if not exists public.orders (
+  id uuid default uuid_generate_v4() primary key,
+  campaign_id uuid references public.campaigns(id) on delete set null,
+  creator_id uuid references public.profiles(id) on delete set null,
+  affiliate_link_id uuid references public.affiliate_links(id) on delete set null,
+  coupon_code_id uuid references public.coupon_codes(id) on delete set null,
+  customer_name text not null,
+  customer_email text,
+  customer_phone text,
+  amount decimal(10,2) default 0,
+  status text default 'pending' check (status in ('pending', 'paid', 'cancelled', 'refunded')),
+  attribution_source text default 'none' check (attribution_source in ('link', 'coupon', 'manual', 'none')),
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists idx_orders_campaign_id on public.orders(campaign_id);
+create index if not exists idx_orders_creator_id on public.orders(creator_id);
+create index if not exists idx_orders_status on public.orders(status);
+create index if not exists idx_orders_created_at on public.orders(created_at);
+
+-- Auto-update updated_at
+drop trigger if exists on_order_updated on public.orders;
+create trigger on_order_updated
+  before update on public.orders
+  for each row execute procedure public.update_updated_at();
+
+alter table public.orders enable row level security;
+
+-- Creators can view orders attributed to them
+create policy "Creators can view own attributed orders" on public.orders
+  for select to authenticated using (auth.uid() = creator_id);
+
+-- Merchants can view orders for their campaigns
+create policy "Merchants can view orders for their campaigns" on public.orders
+  for select to authenticated
+  using (
+    exists (
+      select 1 from public.campaigns c
+      where c.id = campaign_id and c.merchant_id = auth.uid()
+    )
+  );
+
+-- Admin can read all
+create policy "Admin can read all orders" on public.orders
+  for select to authenticated
+  using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+-- Merchants can insert orders (for manual entry)
+create policy "Merchants can create orders" on public.orders
+  for insert to authenticated
+  with check (
+    exists (
+      select 1 from public.campaigns c
+      where c.id = campaign_id and c.merchant_id = auth.uid()
+    )
+  );
+
+-- Merchants can update orders
+create policy "Merchants can update orders" on public.orders
+  for update to authenticated
+  using (
+    exists (
+      select 1 from public.campaigns c
+      where c.id = campaign_id and c.merchant_id = auth.uid()
+    )
+  );
+
+-- ============================================================
+-- ORDER ITEMS
+-- ============================================================
+create table if not exists public.order_items (
+  id uuid default uuid_generate_v4() primary key,
+  order_id uuid references public.orders(id) on delete cascade,
+  product_id uuid references public.products(id) on delete set null,
+  variant_id uuid references public.product_variants(id) on delete set null,
+  qty integer default 1,
+  unit_price decimal(10,2) default 0,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_order_items_order_id on public.order_items(order_id);
+
+alter table public.order_items enable row level security;
+
+-- Merchants can manage order items for their orders
+create policy "Merchants can manage order items" on public.order_items
+  for all to authenticated
+  using (
+    exists (
+      select 1 from public.orders o
+      join public.campaigns c on o.campaign_id = c.id
+      where o.id = order_id and c.merchant_id = auth.uid()
+    )
+  );
+
+-- Admin can read all
+create policy "Admin can read all order items" on public.order_items
+  for select to authenticated
+  using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+-- ============================================================
+-- COMMISSIONS
+-- ============================================================
+create table if not exists public.commissions (
+  id uuid default uuid_generate_v4() primary key,
+  order_id uuid references public.orders(id) on delete cascade,
+  creator_id uuid references public.profiles(id) on delete cascade,
+  campaign_id uuid references public.campaigns(id) on delete cascade,
+  amount decimal(10,2) default 0,
+  rate decimal(5,2) default 0,
+  status text default 'pending' check (status in ('pending', 'approved', 'paid', 'void')),
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists idx_commissions_creator_id on public.commissions(creator_id);
+create index if not exists idx_commissions_campaign_id on public.commissions(campaign_id);
+create index if not exists idx_commissions_status on public.commissions(status);
+create index if not exists idx_commissions_order_id on public.commissions(order_id);
+
+-- Auto-update updated_at
+drop trigger if exists on_commission_updated on public.commissions;
+create trigger on_commission_updated
+  before update on public.commissions
+  for each row execute procedure public.update_updated_at();
+
+alter table public.commissions enable row level security;
+
+-- Creators can view their own commissions
+create policy "Creators can view own commissions" on public.commissions
+  for select to authenticated using (auth.uid() = creator_id);
+
+-- Merchants can view commissions for their campaigns
+create policy "Merchants can view commissions for their campaigns" on public.commissions
+  for select to authenticated
+  using (
+    exists (
+      select 1 from public.campaigns c
+      where c.id = campaign_id and c.merchant_id = auth.uid()
+    )
+  );
+
+-- Admin can manage all commissions
+create policy "Admin can manage all commissions" on public.commissions
+  for all to authenticated
+  using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+-- ============================================================
+-- AUTO-COMMISSION GENERATION TRIGGER
+-- When order status changes to 'paid', generate commission
+-- ============================================================
+create or replace function public.generate_commission_on_order_paid()
+returns trigger as $$
+declare
+  v_campaign record;
+  v_commission_amount decimal(10,2);
+  v_order record;
+begin
+  -- Only proceed if status changed TO paid
+  if new.status = 'paid' and old.status != 'paid' and new.creator_id is not null then
+    -- Get order and campaign details
+    select o.id, o.campaign_id, o.amount, o.affiliate_link_id, o.coupon_code_id,
+           c.commission_rate
+    into v_order
+    from public.orders o
+    join public.campaigns c on o.campaign_id = c.id
+    where o.id = new.id;
+
+    if v_order.campaign_id is not null and v_order.creator_id is not null then
+      -- Calculate commission
+      v_commission_amount := v_order.amount * (v_order.commission_rate / 100);
+
+      -- Insert commission
+      insert into public.commissions (
+        order_id,
+        creator_id,
+        campaign_id,
+        amount,
+        rate,
+        status
+      ) values (
+        v_order.id,
+        v_order.creator_id,
+        v_order.campaign_id,
+        v_commission_amount,
+        v_order.commission_rate,
+        'pending'
+      );
+    end if;
+  end if;
+
+  -- If order cancelled or refunded, void pending commissions
+  if new.status in ('cancelled', 'refunded') and old.status = 'paid' then
+    update public.commissions
+    set status = 'void', updated_at = now()
+    where order_id = new.id and status = 'pending';
+  end if;
+
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_order_paid_generate_commission on public.orders;
+create trigger on_order_paid_generate_commission
+  after update of status on public.orders
+  for each row execute procedure public.generate_commission_on_order_paid();
