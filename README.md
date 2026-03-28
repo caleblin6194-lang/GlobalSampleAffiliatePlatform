@@ -1,37 +1,62 @@
-# Global Sample Affiliate Platform (GSAP)
+# Global Sample Affiliate Platform (GSAP) v5
 
-A Next.js 14 platform connecting brands, content creators, and supplier vendors for product sampling and affiliate marketing.
-
-## Tech Stack
-
-- **Framework:** Next.js 14 (App Router) + TypeScript
-- **Styling:** Tailwind CSS + shadcn/ui
-- **Backend:** Supabase (Auth + PostgreSQL + Row Level Security + Storage)
+A complete affiliate marketing platform connecting **Brands**, **Content Creators**, and **Supplier Vendors** — with product sampling, content workflow, affiliate tracking, commission management, and vendor fulfillment.
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
+
+### 1. Clone & Install
 
 ```bash
-# 1. Clone / extract the project
 cd GlobalSampleAffiliatePlatform
-
-# 2. Install dependencies
 npm install
+```
 
-# 3. Configure environment
+### 2. Configure Environment
+
+```bash
 cp .env.example .env.local
-# Edit .env.local — see Environment Variables section below
+```
 
-# 4. Create Supabase project
-# Go to https://supabase.com and create a new project
+Edit `.env.local` with your Supabase credentials:
 
-# 5. Run database schema
-# In Supabase Dashboard > SQL Editor, paste and run:
-#   → supabase/schema.sql
-#   → supabase/seed.sql (optional, for demo data)
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+```
 
-# 6. Start development server
+### 3. Setup Supabase Database
+
+1. Create a project at [supabase.com](https://supabase.com)
+2. Go to **SQL Editor** and run:
+
+```bash
+# Run in order:
+supabase/schema.sql      # Creates all tables, triggers, RLS policies
+supabase/seed.sql        # Loads demo data (optional)
+```
+
+### 4. Create Demo Users
+
+Before running seed.sql, create users in **Supabase Dashboard → Authentication → Users → Add User**:
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | admin@demo.com | Demo1234! |
+| Merchant | merchant@demo.com | Demo1234! |
+| Merchant | merchant2@demo.com | Demo1234! |
+| Creator | creator@demo.com | Demo1234! |
+| Creator | creator2@demo.com | Demo1234! |
+| Vendor | vendor@demo.com | Demo1234! |
+
+> **Important:** The `seed.sql` references these user IDs. Create users first, then run seed.sql.
+
+### 5. Start Development
+
+```bash
 npm run dev
 ```
 
@@ -39,215 +64,207 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## Environment Variables
+## 📱 Demo Walkthrough
 
-Create `.env.local` in the project root (copy from `.env.example`):
+### Demo Path 1: Admin (Platform Owner)
 
-```bash
-NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+**Purpose:** Show platform-wide visibility and management
+
+1. Login as `admin@demo.com`
+2. View **Dashboard** — Total users, products, campaigns, clicks, orders, commissions
+3. Navigate **Users** — See all platform users
+4. Navigate **Platform Stats** — Overview of all activity
+
+---
+
+### Demo Path 2: Merchant (Brand/Seller) ⭐
+
+**Purpose:** Core user for affiliate marketing platform
+
+**Step 1: Setup Products & Campaigns**
+1. Login as `merchant@demo.com`
+2. Go to **Products** → Add Product (or see existing)
+3. Go to **Campaigns** → Create Campaign
+   - Set commission rate (e.g., 15%)
+   - Set sample quantity
+
+**Step 2: Review Applications**
+1. See pending applications from creators
+2. Click **Approve** or **Reject**
+
+**Step 3: Review Content**
+1. Go to **Content Review**
+2. See submitted content from creators
+3. **Approve** or **Reject** with reason
+
+**Step 4: Create Orders & Track ROI**
+1. Go to **Orders → New Order**
+   - Select campaign, customer info
+   - Optionally attribute to affiliate link/coupon
+2. Mark order as **Paid** → Commission auto-generates
+3. Go to **Analytics** → View:
+   - Total clicks per campaign
+   - Orders and conversion rate
+   - Commission costs
+
+**Step 5: Track Fulfillment**
+1. Go to **Fulfillment**
+2. See all orders (samples & sales) status
+3. View shipped/delivered status with tracking
+
+---
+
+### Demo Path 3: Creator (Influencer/Reviewer) ⭐
+
+**Purpose:** Earn by promoting products
+
+**Step 1: Browse & Apply**
+1. Login as `creator@demo.com`
+2. Go to **Campaigns** → Browse active campaigns
+3. Click **Apply** → Fill shipping info
+
+**Step 2: Complete Content Task**
+1. Go to **My Tasks** → See assigned tasks
+2. Click task → Fill content submission form
+3. Paste your content URL (Instagram/TikTok/YouTube)
+4. Confirm disclosure checkbox
+
+**Step 3: Earn Commissions**
+1. Go to **Earnings**
+2. Copy your **Affiliate Link** (e.g., `/track/ALICE-EARB-2024`)
+3. Share link on social media
+4. When someone orders, commission is earned
+5. Track: clicks, orders, pending/approved commissions
+
+---
+
+### Demo Path 4: Vendor (Supplier/Pick & Ship) ⭐
+
+**Purpose:** Fulfill orders from the warehouse
+
+**Step 1: View Fulfillment Orders**
+1. Login as `vendor@demo.com`
+2. Go to **Orders** → See assigned orders
+3. Each order shows:
+   - Customer address
+   - Product with **barcode code** (e.g., `HQB-A12-SJ-IP15PM-BK`)
+   - Order type (sample/sales)
+
+**Step 2: Process Order**
+1. Click order → See details
+2. Click **Start Picking** → Status: picking
+3. Click **Mark as Packed** → Status: packed
+4. Click **Ship Package**:
+   - Select carrier (DHL, FedEx, UPS, etc.)
+   - Enter tracking number
+   - Submit → Shipment created
+
+**Step 3: View Shipments**
+1. Go to **Shipments**
+2. See all shipped packages with tracking
+
+---
+
+## 🔗 Key Features
+
+### Round 1: Foundation
+- Multi-role authentication (Admin, Merchant, Creator, Vendor)
+- Product catalog with barcode-labeled variants
+- Campaign management
+- Role-based dashboards
+
+### Round 2: Applications
+- Creators apply to campaigns with shipping info
+- Merchants approve/reject applications
+
+### Round 3: Content Workflow
+- Auto task creation on approval
+- Creator task center
+- Content submission with disclosure
+- Merchant content review
+
+### Round 4: Affiliate & Commissions
+- Unique affiliate links per creator/campaign
+- Coupon codes
+- Click tracking (`/track/[code]`)
+- Order attribution
+- Auto-commission on paid orders
+
+### Round 5: Vendor Fulfillment
+- Sample & sales fulfillment orders
+- Pick → Pack → Ship workflow
+- Shipment tracking with carrier & tracking number
+- Barcode display for warehouse picking
+
+---
+
+## 🏗️ Tech Stack
+
+- **Framework:** Next.js 14 (App Router) + TypeScript
+- **Styling:** Tailwind CSS + shadcn/ui
+- **Backend:** Supabase (Auth + PostgreSQL + RLS)
+
+---
+
+## 📁 Project Structure
+
 ```
-
-Find these values in Supabase Dashboard → Project Settings → API.
-
----
-
-## Supabase Setup Steps
-
-### Step 1: Create a Supabase Project
-
-1. Go to [supabase.com](https://supabase.com) and sign up
-2. Create a new project (takes ~2 minutes)
-3. Copy the **Project URL** and **anon/public key** from Settings → API
-
-### Step 2: Run the Database Schema
-
-In Supabase Dashboard → SQL Editor:
-
-1. Paste and run **`supabase/schema.sql`**
-2. This creates all tables, triggers, and RLS policies for Rounds 1-5:
-   - `profiles` — user profiles with roles
-   - `brands` — merchant brand listings
-   - `creator_channels` — creator social media channels
-   - `vendors` — supplier vendor profiles
-   - `products` — product catalog
-   - `product_variants` — product variants with auto-generated barcodes
-   - `campaigns` — sampling campaigns
-   - `campaign_applications` — creator applications (Round 2)
-   - `creator_tasks` — tasks auto-generated when application approved (Round 3)
-   - `creator_contents` — content submitted by creators (Round 3)
-   - `affiliate_links` — unique tracking links per creator per campaign (Round 4)
-   - `coupon_codes` — discount codes (Round 4)
-   - `clicks` — click tracking records (Round 4)
-   - `orders` — customer orders with attribution (Round 4)
-   - `order_items` — items within orders (Round 4)
-   - `commissions` — auto-generated commissions on paid orders (Round 4)
-   - `fulfillment_orders` — vendor fulfillment tracking (Round 5)
-   - `shipments` — shipment tracking with carrier & tracking no (Round 5)
-
-### Step 3: Verify Triggers
-
-After running schema.sql, verify these triggers exist:
-
-1. Go to Supabase Dashboard → Database → Triggers
-2. You should see:
-   - **`on_auth_user_created`** on `auth.users`
-   - **`on_application_approved_create_task`** on `campaign_applications` (Round 3)
-   - **`on_order_paid_generate_commission`** on `orders` (Round 4)
-   - **`on_application_approved_create_sample_fulfillment`** on `campaign_applications` (Round 5)
-   - **`on_order_paid_create_sales_fulfillment`** on `orders` (Round 5)
-
-### Step 4: (Optional) Load Demo Data
-
-In Supabase Dashboard → SQL Editor, paste and run **`supabase/seed.sql`**.
-
-> **Important:** The seed.sql contains commented-out INSERT statements. Before running them, you must first create the demo users in Supabase Dashboard → Authentication → Users → Add User.
-
----
-
-## Demo Accounts
-
-All demo accounts use password: `Demo1234!`
-
-| Role | Email | Name |
-|------|-------|------|
-| Admin | admin@demo.com | System Admin |
-| Merchant | merchant@demo.com | Jane Merchant |
-| Merchant | merchant2@demo.com | Bob Brands |
-| Creator | creator@demo.com | Alice Creator |
-| Creator | creator2@demo.com | Charlie Tube |
-| Vendor | vendor@demo.com | David Vendor |
-
----
-
-## User Roles
-
-| Role | Dashboard | Description |
-|------|----------|-------------|
-| `admin` | `/admin/dashboard` | Platform administration |
-| `merchant` | `/merchant/dashboard` | Brand & campaign management |
-| `creator` | `/creator/dashboard` | Content creator sampling requests |
-| `vendor` | `/vendor/dashboard` | Supplier vendor product & inventory management |
-
----
-
-## Feature Rounds
-
-### Round 1 (Foundation)
-- **Multi-role authentication** — Admin, Merchant, Creator, Vendor
-- **Product catalog** — Vendors manage products with barcode-labeled variants
-- **Campaign management** — Merchants create and manage sampling campaigns
-- **Creator channels** — Creators link social media and request samples
-- **Role-based dashboards** — Each role has a dedicated dashboard
-- **Row Level Security** — Supabase RLS policies protect data per role
-
-### Round 2 (Applications)
-- **Campaign applications** — Creators apply to campaigns with shipping info
-- **Merchant review** — Merchants approve/reject applications
-- **Status tracking** — Pending → Approved/Rejected workflow
-
-### Round 3 (Content Workflow)
-- **Auto task generation** — When application approved, task auto-created
-- **Creator task center** — Creators view and manage their tasks
-- **Content submission** — Creators submit content links with disclosure
-- **Merchant content review** — Merchants approve/reject content
-- **Status linkage** — Task and content status stay in sync
-- **Admin dashboard** — Content statistics added
-
-### Round 4 (Affiliate & Commissions)
-- **Affiliate links** — Unique tracking links per creator per campaign
-- **Coupon codes** — Discount codes (creator-specific or general)
-- **Click tracking** — `/track/[code]` records clicks then redirects
-- **Order attribution** — Orders linked to creator via link or coupon
-- **Auto-commission** — Paid orders generate commissions automatically
-- **Merchant analytics** — Campaign-level clicks, orders, conversion rate
-- **Creator earnings** — Dashboard showing links, clicks, commissions
-
-### Round 5 (Vendor Fulfillment) ⭐ Current
-- **Fulfillment orders** — Sample & sales fulfillment tracking
-- **Auto-fulfillment creation** — Sample from approved apps, sales from paid orders
-- **Vendor dashboard** — Order picking, packing, shipping workflow
-- **Shipment tracking** — Carrier + tracking number management
-- **Barcode display** — Barcode codes shown for each item (HQB-format)
-- **Merchant fulfillment view** — Track all campaign fulfillment status
-
----
-
-## Project Structure
-
-```
-src/
-├── app/
-│   ├── (auth)/           # Auth pages (login, register)
-│   ├── (dashboard)/      # Role-based dashboards
-│   │   ├── admin/
-│   │   ├── creator/
-│   │   │   ├── tasks/         # Round 3: Task list & detail
-│   │   │   └── earnings/      # Round 4: Earnings dashboard
-│   │   ├── merchant/
-│   │   │   ├── content/       # Round 3: Content review
-│   │   │   ├── orders/        # Round 4: Order management
-│   │   │   ├── fulfillment/    # Round 5: Fulfillment tracking
-│   │   │   └── analytics/     # Round 4: Campaign analytics
-│   │   └── vendor/
-│   │       ├── orders/        # Round 5: Fulfillment orders
-│   │       └── shipments/     # Round 5: Shipment tracking
-│   ├── api/              # API routes
-│   └── track/[code]/    # Round 4: Public tracking landing
-└── components/
-    ├── dashboard/        # Shared dashboard components
-    └── ui/               # shadcn/ui components
-```
-
----
-
-## Development
-
-```bash
-# Run type checking
-npm run type-check
-
-# Run linting
-npm run lint
-
-# Build for production
-npm run build
+GlobalSampleAffiliatePlatform/
+├── src/
+│   ├── app/
+│   │   ├── (auth)/              # Login, Register
+│   │   ├── (dashboard)/         # Role-based pages
+│   │   │   ├── admin/
+│   │   │   ├── creator/
+│   │   │   ├── merchant/
+│   │   │   └── vendor/
+│   │   ├── api/                 # API routes
+│   │   └── track/[code]/       # Affiliate tracking
+│   ├── components/
+│   │   ├── dashboard/
+│   │   └── ui/
+│   └── lib/
+│       └── supabase/
+├── supabase/
+│   ├── schema.sql               # Database schema
+│   └── seed.sql                 # Demo data
+└── README.md
 ```
 
 ---
 
-## What's NOT in This Version
+## ⚙️ Database Tables
 
-The following are intentionally not implemented to keep the scope focused:
-
-- **Stripe / PayPal payments** — Order simulation only
-- **Payouts** — No actual fund transfers
-- **Email notifications** — Manual updates only
-- **Real barcode scanning hardware** — Barcode display only, no scanner integration
-- **Multi-language** — English only
+| Table | Description |
+|-------|-------------|
+| `profiles` | User profiles with roles |
+| `brands` | Merchant brand listings |
+| `products` | Product catalog |
+| `product_variants` | Variants with auto-generated barcodes |
+| `campaigns` | Sampling campaigns |
+| `campaign_applications` | Creator applications |
+| `creator_tasks` | Auto-generated tasks |
+| `creator_contents` | Submitted content |
+| `affiliate_links` | Tracking links |
+| `coupon_codes` | Discount codes |
+| `clicks` | Click tracking |
+| `orders` | Customer orders |
+| `commissions` | Auto-generated commissions |
+| `fulfillment_orders` | Vendor fulfillment |
+| `shipments` | Shipment tracking |
 
 ---
 
-## Complete Workflow Summary
+## 🎯 What's NOT Included (v5)
 
-### Sample Flow (Round 2 → 3 → 5)
-1. Creator applies to campaign → `/creator/campaigns/[id]/apply`
-2. Merchant approves → Task auto-created + Sample Fulfillment auto-created
-3. Creator submits content → `/creator/tasks/[id]`
-4. Vendor picks & ships → `/vendor/orders/[id]`
-5. Merchant tracks → `/merchant/fulfillment`
+- Stripe/PayPal payments (order simulation only)
+- Payout system
+- Email notifications
+- Real barcode scanner hardware
+- Multi-language
 
-### Sales Flow (Round 4 → 5)
-1. Creator promotes with affiliate link → `/creator/earnings`
-2. Customer clicks track link → `/track/[code]` → Records click
-3. Merchant creates simulated order → `/merchant/orders/new`
-4. Order marked paid → Commission auto-generated + Sales Fulfillment auto-created
-5. Vendor picks & ships → `/vendor/orders/[id]`
-6. Merchant tracks → `/merchant/fulfillment`
+---
 
-### Creator Earnings Flow (Round 4)
-1. Creator views links & coupons → `/creator/earnings`
-2. Creator tracks clicks, orders, commissions
-3. Commission generated when order paid
+## 📄 License
+
+This is a demonstration project for the Global Sample Affiliate Platform concept.
