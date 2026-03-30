@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ExternalLink, Eye, FileText } from "lucide-react";
+import { ExternalLink, Eye, FileText, Globe } from "lucide-react";
 
 const statusColors: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
   pending: "secondary",

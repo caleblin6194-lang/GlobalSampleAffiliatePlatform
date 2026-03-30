@@ -17,7 +17,7 @@ export async function GET(
     .from('orders')
     .select(`
       id, customer_name, customer_email, customer_phone, amount, status,
-      attribution_source, notes, created_at, updated_at,
+      attribution_source, notes, created_at, updated_at, creator_id,
       campaign:campaigns(id, title, merchant_id),
       creator:profiles!orders_creator_id_fkey(id, full_name),
       affiliate_link:affiliate_links(code),

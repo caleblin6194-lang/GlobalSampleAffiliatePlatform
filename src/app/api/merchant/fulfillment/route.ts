@@ -41,7 +41,7 @@ export async function GET(request: Request) {
   const { data: orders } = await supabase
     .from('fulfillment_orders')
     .select(`
-      id, order_type, customer_name, status, created_at,
+      id, order_type, customer_name, status, created_at, campaign_id,
       campaign:campaigns(id, title),
       vendor:vendors(id, vendor_name),
       shipments(id, carrier, tracking_no, shipped_at, status)

@@ -22,7 +22,7 @@ export async function GET(
   const { data: task, error } = await supabase
     .from('creator_tasks')
     .select(`
-      id, status, title, description, due_at, created_at, updated_at,
+      id, status, title, description, due_at, created_at, updated_at, creator_id, merchant_id, campaign_id,
       campaign:campaigns(
         id, title, description, commission_rate, sample_qty,
         product:products(id, title, description, image_url, category)

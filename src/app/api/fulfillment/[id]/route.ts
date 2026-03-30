@@ -18,6 +18,7 @@ export async function GET(
     .select(`
       id, order_type, customer_name, phone, country, state, city, address_line1, address_line2, postal_code,
       status, notes, created_at, updated_at,
+      vendor_id, merchant_id, creator_id, campaign_id, order_id, application_id, task_id,
       campaign:campaigns(id, title, description),
       application:campaign_applications(id, shipping_name, phone, country, state, city, address_line1, address_line2, postal_code),
       order:orders(id, customer_name, customer_email, customer_phone, amount, status),

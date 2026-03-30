@@ -275,7 +275,7 @@ create table if not exists public.coupon_codes (
 create unique index if not exists idx_coupon_codes_creator_campaign_code 
   on public.coupon_codes(creator_id, campaign_id, code);
 
-alter table public.coupon_codes enable row security;
+alter table public.coupon_codes enable row level security;
 
 -- Creators can view their own coupons
 create policy "Creators can view own coupon codes" on public.coupon_codes

@@ -111,7 +111,7 @@ export default async function MerchantDashboard() {
   const { data: recentFulfillment } = await supabase
     .from("fulfillment_orders")
     .select(`
-      id, status, customer_name, created_at,
+      id, order_type, status, customer_name, created_at,
       campaign:campaigns(title),
       vendor:vendors(vendor_name)
     `)

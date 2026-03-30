@@ -106,7 +106,7 @@ export async function GET(request: Request) {
   const { data: content, error } = await supabase
     .from('creator_contents')
     .select(`
-      id, platform, content_url, content_title, content_description,
+      id, creator_id, platform, content_url, content_title, content_description,
       posted_at, disclosure_checked, screenshot_url, status,
       rejection_reason, created_at, updated_at,
       task:creator_tasks(id, title, status, description),
