@@ -1,5 +1,20 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
+
+const ApplicationSchema = z.object({
+  campaign_id: z.string().uuid(),
+  shipping_name: z.string().min(1, 'Shipping name is required'),
+  phone: z.string().min(1, 'Phone is required'),
+  country: z.string().min(1, 'Country is required'),
+  state: z.string().optional(),
+  city: z.string().min(1, 'City is required'),
+  address_line1: z.string().min(1, 'Address is required'),
+  address_line2: z.string().optional(),
+  postal_code: z.string().min(1, 'Postal code is required'),
+  notes: z.string().optional(),
+  selected_platform: z.string().min(1, 'Platform is required'),
+});
 
 // GET: List applications (filtered by role)
 export async function GET(request: Request) {
@@ -11,6 +26,17 @@ export async function GET(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // Role check - only merchants, admins, or creators can view applications
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (profile?.role !== 'merchant' && profile?.role !== 'admin' && profile?.role !== 'creator') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   let query = supabase
     .from('campaign_applications')
@@ -54,11 +80,32 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // Role check - only creators can apply
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (profile?.role !== 'creator' && profile?.role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const body = await request.json();
+
+  // Validate request body
+  const validationResult = ApplicationSchema.safeParse(body);
+  if (!validationResult.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: validationResult.error.flatten() },
+      { status: 400 }
+    );
+  }
+
   const {
     campaign_id, shipping_name, phone, country, state, city,
     address_line1, address_line2, postal_code, notes, selected_platform
-  } = body;
+  } = validationResult.data;
 
   // Check if already applied
   const { data: existing } = await supabase
@@ -101,6 +148,17 @@ export async function PATCH(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // Role check - only merchants or admins can review
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (profile?.role !== 'merchant' && profile?.role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const body = await request.json();
   const { id, status, rejection_reason } = body;

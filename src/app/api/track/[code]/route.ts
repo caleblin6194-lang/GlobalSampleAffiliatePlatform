@@ -2,6 +2,28 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 
+// Simple in-memory rate limiter (5 requests per minute per IP)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 5;
+const RATE_WINDOW_MS = 60 * 1000;
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const record = rateLimitMap.get(ip);
+  
+  if (!record || now > record.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return false;
+  }
+  
+  if (record.count >= RATE_LIMIT) {
+    return true;
+  }
+  
+  record.count++;
+  return false;
+}
+
 // GET /api/track/[code] - Track click and redirect
 export async function GET(
   request: Request,
@@ -9,6 +31,12 @@ export async function GET(
 ) {
   const supabase = await createClient();
   const headersList = headers();
+
+  // Rate limiting
+  const ip = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown';
+  if (isRateLimited(ip)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
 
   // Find affiliate link by code
   const { data: affiliateLink, error } = await supabase

@@ -17,6 +17,10 @@ export async function GET(request: Request) {
     .eq('id', user.id)
     .single();
 
+  if (profile?.role !== 'vendor' && profile?.role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const { data: vendor } = await supabase
     .from('vendors')
     .select('id')

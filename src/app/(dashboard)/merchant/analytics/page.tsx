@@ -8,10 +8,31 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MousePointer, ShoppingCart, DollarSign, TrendingUp, BarChart3 } from "lucide-react";
 
+interface CampaignStats {
+  campaign: string;
+  campaignId: string;
+  clicks: number;
+  orders: number;
+  orderAmount: number;
+  commissions: number;
+  conversionRate: string;
+}
+
+interface AnalyticsData {
+  totals: {
+    totalClicks: number;
+    totalOrders: number;
+    totalOrderAmount: number;
+    totalCommissions: number;
+    conversionRate: string;
+  };
+  byCampaign: CampaignStats[];
+}
+
 export default function MerchantAnalyticsPage() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<AnalyticsData | null>(null);
 
   useEffect(() => {
     fetchAnalytics();
@@ -35,7 +56,13 @@ export default function MerchantAnalyticsPage() {
   }
 
   const { totals, byCampaign } = data || {
-    totals: {},
+    totals: {
+      totalClicks: 0,
+      totalOrders: 0,
+      totalOrderAmount: 0,
+      totalCommissions: 0,
+      conversionRate: "0",
+    },
     byCampaign: [],
   };
 
@@ -120,7 +147,7 @@ export default function MerchantAnalyticsPage() {
                     <span>Commission</span>
                     <span>Conv. Rate</span>
                   </div>
-                  {byCampaign.map((item: any) => (
+                  {byCampaign.map((item: CampaignStats) => (
                     <div key={item.campaignId} className="grid grid-cols-6 gap-4 items-center p-3 border rounded-lg">
                       <span className="text-sm font-medium truncate">{item.campaign}</span>
                       <span className="text-sm">{item.clicks}</span>
@@ -146,13 +173,13 @@ export default function MerchantAnalyticsPage() {
                 <div className="p-4 border rounded-lg">
                   <p className="text-xs text-muted-foreground">Avg. Order Value</p>
                   <p className="text-2xl font-bold">
-                    ${totals?.totalOrders > 0 ? (totals?.totalOrderAmount / totals?.totalOrders).toFixed(2) : "0.00"}
+                    ${totals.totalOrders > 0 ? (totals.totalOrderAmount / totals.totalOrders).toFixed(2) : "0.00"}
                   </p>
                 </div>
                 <div className="p-4 border rounded-lg">
                   <p className="text-xs text-muted-foreground">Commission Rate</p>
                   <p className="text-2xl font-bold">
-                    {totals?.totalOrderAmount > 0 ? ((totals?.totalCommissions / totals?.totalOrderAmount) * 100).toFixed(1) : "0"}%
+                    {totals.totalOrderAmount > 0 ? ((totals.totalCommissions / totals.totalOrderAmount) * 100).toFixed(1) : "0"}%
                   </p>
                 </div>
               </div>
@@ -162,7 +189,7 @@ export default function MerchantAnalyticsPage() {
                 <div className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-green-600" />
                   <span className="text-sm">
-                    {totals?.totalOrders > 0
+                    {totals.totalOrders > 0
                       ? "Your campaigns are generating sales through the affiliate program."
                       : "Start promoting your campaigns to see ROI data."}
                   </span>

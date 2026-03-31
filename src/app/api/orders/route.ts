@@ -1,5 +1,27 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
+
+const OrderItemSchema = z.object({
+  product_id: z.string().uuid(),
+  variant_id: z.string().uuid().optional(),
+  qty: z.number().int().positive().default(1),
+  unit_price: z.number().nonnegative().default(0),
+});
+
+const CreateOrderSchema = z.object({
+  campaign_id: z.string().uuid(),
+  creator_id: z.string().uuid().optional(),
+  affiliate_link_id: z.string().uuid().optional(),
+  coupon_code_id: z.string().uuid().optional(),
+  customer_name: z.string().min(1, 'Customer name is required'),
+  customer_email: z.string().email().optional(),
+  customer_phone: z.string().optional(),
+  amount: z.number().nonnegative().optional(),
+  attribution_source: z.string().optional(),
+  notes: z.string().optional(),
+  items: z.array(OrderItemSchema).optional(),
+});
 
 // GET /api/orders - List orders
 export async function GET(request: Request) {
@@ -88,6 +110,16 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
+
+  // Validate request body
+  const validationResult = CreateOrderSchema.safeParse(body);
+  if (!validationResult.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: validationResult.error.flatten() },
+      { status: 400 }
+    );
+  }
+
   const {
     campaign_id,
     creator_id,
@@ -100,7 +132,7 @@ export async function POST(request: Request) {
     attribution_source,
     notes,
     items,
-  } = body;
+  } = validationResult.data;
 
   // Verify campaign belongs to merchant
   if (profile?.role === 'merchant') {
