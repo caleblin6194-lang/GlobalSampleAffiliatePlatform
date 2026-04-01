@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,16 +10,36 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+const VALID_ROLES = ['creator', 'merchant', 'vendor'] as const;
+type Role = typeof VALID_ROLES[number];
+
+function getDashboardPath(role: string): string {
+  switch (role) {
+    case 'merchant': return '/merchant/dashboard';
+    case 'creator': return '/creator/dashboard';
+    case 'vendor': return '/vendor/dashboard';
+    default: return '/login';
+  }
+}
+
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState('creator');
+  const [role, setRole] = useState<Role>('creator');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+
+  // Auto-select role from URL params on mount
+  useEffect(() => {
+    const roleParam = searchParams.get('role');
+    if (roleParam && VALID_ROLES.includes(roleParam as Role)) {
+      setRole(roleParam as Role);
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,8 +58,8 @@ export default function RegisterPage() {
       setError(error.message);
       setLoading(false);
     } else {
-      setSuccess(true);
-      setLoading(false);
+      // Redirect to role-specific dashboard on success
+      router.push(getDashboardPath(role));
     }
   };
 
@@ -49,12 +69,6 @@ export default function RegisterPage() {
         <CardTitle>Create Account</CardTitle>
         <CardDescription>Join the Global Sample Affiliate Platform</CardDescription>
       </CardHeader>
-      {success && (
-        <div className="mx-6 mt-4 rounded-md bg-green-50 border border-green-200 p-4">
-          <p className="text-sm text-green-800 font-medium">Account created!</p>
-          <p className="text-xs text-green-600 mt-1">Check your email to confirm, then sign in.</p>
-        </div>
-      )}
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           {error && (
@@ -97,16 +111,16 @@ export default function RegisterPage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="role">Account Type</Label>
-            <select
-              id="role"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <option value="creator">Content Creator</option>
-              <option value="merchant">Brand Merchant</option>
-              <option value="vendor">Supplier Vendor</option>
-            </select>
+            <Select value={role} onValueChange={(val) => setRole(val as Role)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select account type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="creator">Content Creator</SelectItem>
+                <SelectItem value="merchant">Brand Merchant</SelectItem>
+                <SelectItem value="vendor">Supplier Vendor</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
