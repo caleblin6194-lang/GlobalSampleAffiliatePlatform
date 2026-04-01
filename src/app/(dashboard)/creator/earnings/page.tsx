@@ -6,7 +6,7 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Copy, ExternalLink, MousePointer, ShoppingCart, DollarSign, TrendingUp, CopyCheck } from "lucide-react";
+import { Copy, ExternalLink, MousePointer, ShoppingCart, DollarSign, TrendingUp, CopyCheck, Wallet } from "lucide-react";
 import Link from "next/link";
 
 const statusColors: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
@@ -76,11 +76,36 @@ export default function CreatorEarningsPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <StatCard title="Total Clicks" value={stats?.totalClicks || 0} icon={MousePointer} />
         <StatCard title="Paid Orders" value={stats?.totalOrders || 0} icon={ShoppingCart} />
         <StatCard title="Pending Commission" value={`$${(stats?.pendingCommission || 0).toFixed(2)}`} icon={DollarSign} className={stats?.pendingCommission > 0 ? "border-yellow-300" : ""} />
-        <StatCard title="Total Earned" value={`$${((stats?.paidCommission || 0) + (stats?.approvedCommission || 0)).toFixed(2)}`} icon={TrendingUp} className="border-green-300" />
+        <StatCard title="Approved" value={`$${(stats?.approvedCommission || 0).toFixed(2)}`} icon={TrendingUp} className="border-blue-300" />
+        <Card className="border-green-300">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 mb-1">
+              <Wallet className="h-4 w-4 text-green-600" />
+              <span className="text-xs text-muted-foreground">Withdrawable</span>
+            </div>
+            <div className="text-2xl font-bold text-green-600">
+              ${(stats?.withdrawableBalance || 0).toFixed(2)}
+            </div>
+            {(stats?.withdrawableBalance || 0) > 0 && (
+              <Button size="sm" variant="outline" className="mt-2 w-full text-green-600 border-green-300 hover:bg-green-50" onClick={() => {
+                const amount = (stats?.withdrawableBalance || 0).toFixed(2);
+                if (confirm(`Request payout of $${amount}?`)) {
+                  fetch('/api/payouts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: parseFloat(amount), payment_method: 'bank_transfer' }),
+                  }).then(r => r.json()).then(() => fetchEarnings());
+                }
+              }}>
+                Request Withdrawal
+              </Button>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Quick Actions */}

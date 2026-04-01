@@ -97,6 +97,18 @@ export async function GET() {
     ?.filter(o => o.status === 'paid')
     .reduce((sum, o) => sum + (o.amount || 0), 0) || 0;
 
+  // Get pending payouts
+  const { data: pendingPayouts } = await supabase
+    .from('payouts')
+    .select('amount')
+    .eq('user_id', user.id)
+    .eq('status', 'pending');
+
+  const pendingPayoutAmount = pendingPayouts?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+
+  // Withdrawable = approved commissions - pending payouts
+  const withdrawableBalance = Math.max(0, approvedCommission - pendingPayoutAmount);
+
   return NextResponse.json({
     affiliateLinks: affiliateLinks?.map(l => ({
       ...l,
@@ -111,6 +123,8 @@ export async function GET() {
       approvedCommission,
       paidCommission,
       totalCommission: pendingCommission + approvedCommission + paidCommission,
+      withdrawableBalance,
+      pendingPayoutAmount,
     },
     commissions: commissions || [],
   });

@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const VALID_ROLES = ['creator', 'merchant', 'vendor'] as const;
+const VALID_ROLES = ['creator', 'merchant', 'vendor', 'buyer'] as const;
 type Role = typeof VALID_ROLES[number];
 
 function getDashboardPath(role: string): string {
@@ -18,6 +18,7 @@ function getDashboardPath(role: string): string {
     case 'merchant': return '/merchant/dashboard';
     case 'creator': return '/creator/dashboard';
     case 'vendor': return '/vendor/dashboard';
+    case 'buyer': return '/buyer/dashboard';
     default: return '/login';
   }
 }
@@ -116,6 +117,7 @@ export default function RegisterPage() {
                 <SelectValue placeholder="Select account type" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="buyer">Shop & Earn</SelectItem>
                 <SelectItem value="creator">Content Creator</SelectItem>
                 <SelectItem value="merchant">Brand Merchant</SelectItem>
                 <SelectItem value="vendor">Supplier Vendor</SelectItem>

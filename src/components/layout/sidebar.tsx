@@ -48,6 +48,11 @@ const roleNavItems: Record<string, NavItem[]> = {
     { label: "Products", href: "/vendor/products", icon: Package },
     { label: "Inventory", href: "/vendor/inventory", icon: BarChart3 },
   ],
+  buyer: [
+    { label: "Dashboard", href: "/buyer/dashboard", icon: LayoutDashboard },
+    { label: "My Orders", href: "/buyer/orders", icon: ShoppingCart },
+    { label: "Become a Creator", href: "/become-creator", icon: Video },
+  ],
 };
 
 interface SidebarProps {
