@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { MerchantOnboarding } from "@/components/dashboard/onboarding-merchant";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -165,6 +166,11 @@ export default async function MerchantDashboard() {
         <StatCard title="Shipped" value={shippedFulfillment} icon={Truck} />
         <StatCard title="Commission Cost" value={`$${totalCommissionCost.toFixed(2)}`} icon={DollarSign} />
       </div>
+
+      {/* New Merchant Onboarding */}
+      {totalProducts === 0 && (campaigns?.length ?? 0) === 0 && (
+        <MerchantOnboarding />
+      )}
 
       {/* Quick Links */}
       <div className="grid gap-4 md:grid-cols-4">

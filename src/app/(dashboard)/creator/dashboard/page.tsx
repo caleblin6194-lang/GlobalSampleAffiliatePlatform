@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { CreatorOnboarding } from "@/components/dashboard/onboarding-creator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Video, ShoppingBag, CheckCircle, TrendingUp, Compass } from "lucide-react";
@@ -81,6 +82,9 @@ export default async function CreatorDashboard() {
           icon={CheckCircle}
         />
       </div>
+
+      {/* New Creator Onboarding */}
+      {(totalChannels ?? 0) === 0 && <CreatorOnboarding />}
 
       {channels && channels.length > 0 && (
         <Card>
