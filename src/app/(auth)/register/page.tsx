@@ -29,22 +29,25 @@ export default function RegisterPage() {
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<Role>('creator');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess(false);
     setLoading(true);
 
     try {
       const supabase = createClient();
 
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: { full_name: fullName, role },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
@@ -54,10 +57,25 @@ export default function RegisterPage() {
         return;
       }
 
-      router.push(getDashboardPath(role));
-    } catch (err) {
+      // Check if user was created successfully
+      if (data.user) {
+        // Check if email confirmation is required
+        if (data.user.confirmation_sent_at) {
+          setSuccess(true);
+          setLoading(false);
+          return;
+        }
+
+        // If no confirmation needed, redirect to dashboard
+        router.push(getDashboardPath(role));
+      } else {
+        // User might need email confirmation
+        setSuccess(true);
+        setLoading(false);
+      }
+    } catch (err: any) {
       console.error('Registration error:', err);
-      setError('An unexpected error occurred. Please try again.');
+      setError(err.message || 'An unexpected error occurred. Please try again.');
       setLoading(false);
     }
   }, [email, password, fullName, role, router]);
@@ -69,73 +87,98 @@ export default function RegisterPage() {
           <CardTitle>Create Account</CardTitle>
           <CardDescription>Join the Global Sample Affiliate Platform</CardDescription>
         </CardHeader>
-        <form onSubmit={handleSubmit}>
+        
+        {success ? (
           <CardContent className="space-y-4">
-            {error && (
-              <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-                {error}
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name</Label>
-              <Input
-                id="fullName"
-                type="text"
-                placeholder="Jane Merchant"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-              />
+            <div className="rounded-md bg-green-500/10 p-4 text-sm text-green-500">
+              <p className="font-medium mb-1">Check your email!</p>
+              <p>We&apos;ve sent a confirmation link to <strong>{email}</strong>. Please click the link to activate your account.</p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="role">Account Type</Label>
-              <Select value={role} onValueChange={(val) => setRole(val as Role)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select account type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="buyer">Shop & Earn</SelectItem>
-                  <SelectItem value="creator">Content Creator</SelectItem>
-                  <SelectItem value="merchant">Brand Merchant</SelectItem>
-                  <SelectItem value="vendor">Supplier Vendor</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-          <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Creating account...' : 'Create Account'}
-            </Button>
             <p className="text-sm text-muted-foreground text-center">
-              Already have an account?{' '}
+              Didn&apos;t receive the email?{' '}
+              <button 
+                onClick={() => setSuccess(false)} 
+                className="text-primary hover:underline"
+              >
+                Try again
+              </button>
+            </p>
+            <p className="text-sm text-muted-foreground text-center">
+              Already confirmed?{' '}
               <Link href="/login" className="text-primary hover:underline">
                 Sign in
               </Link>
             </p>
-          </CardFooter>
-        </form>
+          </CardContent>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <CardContent className="space-y-4">
+              {error && (
+                <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                  {error}
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Full Name</Label>
+                <Input
+                  id="fullName"
+                  type="text"
+                  placeholder="John Doe"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="role">Account Type</Label>
+                <Select value={role} onValueChange={(val) => setRole(val as Role)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select account type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="buyer">Shop & Earn</SelectItem>
+                    <SelectItem value="creator">Content Creator</SelectItem>
+                    <SelectItem value="merchant">Brand Merchant</SelectItem>
+                    <SelectItem value="vendor">Supplier Vendor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+            <CardFooter className="flex flex-col space-y-4">
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Creating account...' : 'Create Account'}
+              </Button>
+              <p className="text-sm text-muted-foreground text-center">
+                Already have an account?{' '}
+                <Link href="/login" className="text-primary hover:underline">
+                  Sign in
+                </Link>
+              </p>
+            </CardFooter>
+          </form>
+        )}
       </Card>
     </div>
   );
