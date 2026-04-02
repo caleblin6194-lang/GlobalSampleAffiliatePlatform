@@ -17,7 +17,7 @@ function stripWrappingQuotes(value: string): string {
 function normalizeSupabaseUrl(rawUrl?: string): string | null {
   if (!rawUrl) return null;
 
-  let value = stripWrappingQuotes(rawUrl);
+  let value = stripWrappingQuotes(rawUrl).replace(/\s+/g, '');
   if (!value) return null;
 
   // Allow environment values like "project-ref.supabase.co"
@@ -38,7 +38,7 @@ function normalizeSupabaseUrl(rawUrl?: string): string | null {
 
 function normalizeAnonKey(rawKey?: string): string | null {
   if (!rawKey) return null;
-  const value = stripWrappingQuotes(rawKey);
+  const value = stripWrappingQuotes(rawKey).replace(/\s+/g, '');
   return value || null;
 }
 

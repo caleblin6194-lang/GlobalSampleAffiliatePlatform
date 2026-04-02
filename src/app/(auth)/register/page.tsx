@@ -13,6 +13,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 const VALID_ROLES = ['creator', 'merchant', 'vendor', 'buyer'] as const;
 type Role = typeof VALID_ROLES[number];
 
+function isInvalidParamError(message?: string) {
+  if (!message) return false;
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('invalid parameter') ||
+    normalized.includes('invalid name') ||
+    message.includes('参数名无效')
+  );
+}
+
 function getDashboardPath(role: string): string {
   switch (role) {
     case 'merchant': return '/merchant/dashboard';
@@ -33,6 +43,41 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  const signUpWithFallback = useCallback(
+    async (emailValue: string, passwordValue: string, nameValue: string, selectedRole: Role) => {
+      const supabase = createClient();
+      const baseOptions = {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      };
+
+      const attempts = [
+        { data: { full_name: nameValue, role: selectedRole } },
+        { data: { full_name: nameValue, requested_role: selectedRole } },
+        { data: { full_name: nameValue } },
+      ];
+
+      let lastError: any = null;
+      for (let i = 0; i < attempts.length; i += 1) {
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email: emailValue,
+          password: passwordValue,
+          options: { ...baseOptions, ...attempts[i] },
+        });
+
+        if (!signUpError) {
+          return { data, error: null };
+        }
+
+        lastError = signUpError;
+        const shouldRetry = i < attempts.length - 1 && isInvalidParamError(signUpError.message);
+        if (!shouldRetry) break;
+      }
+
+      return { data: null, error: lastError };
+    },
+    []
+  );
+
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -40,16 +85,12 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
-
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await signUpWithFallback(
         email,
         password,
-        options: {
-          data: { full_name: fullName, role },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
+        fullName,
+        role
+      );
 
       if (signUpError) {
         setError(signUpError.message);
@@ -58,7 +99,7 @@ export default function RegisterPage() {
       }
 
       // Check if user was created successfully
-      if (data.user) {
+      if (data?.user) {
         // Check if email confirmation is required
         if (data.user.confirmation_sent_at) {
           setSuccess(true);
@@ -78,7 +119,7 @@ export default function RegisterPage() {
       setError(err.message || 'An unexpected error occurred. Please try again.');
       setLoading(false);
     }
-  }, [email, password, fullName, role, router]);
+  }, [email, password, fullName, role, router, signUpWithFallback]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
