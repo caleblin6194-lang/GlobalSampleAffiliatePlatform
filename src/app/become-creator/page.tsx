@@ -34,11 +34,11 @@ export default function BecomeCreatorPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
-  const supabase = createClient();
 
   const handleUpgrade = async () => {
     setLoading(true);
     setError('');
+    const supabase = createClient();
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
