@@ -46,6 +46,7 @@ export async function updateSession(request: NextRequest) {
       merchant: ['/merchant'],
       creator: ['/creator'],
       vendor: ['/vendor'],
+      buyer: ['/buyer'],
     };
 
     const allowedPaths = rolePaths[role] || [];
