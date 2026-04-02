@@ -18,8 +18,8 @@ export async function updateSession(request: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    // If no env vars, allow the request to proceed (for development)
-    if (!supabaseUrl || !supabaseAnonKey) {
+    // If no valid env vars, allow the request to proceed
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseUrl.startsWith('http')) {
       return NextResponse.next({ request });
     }
 
@@ -49,7 +49,6 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   } catch (error) {
     // If anything fails in middleware, just continue
-    console.error('Middleware error:', error);
     return NextResponse.next({ request });
   }
 }
