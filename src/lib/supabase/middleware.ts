@@ -1,33 +1,33 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { tryGetSupabaseClientEnv } from './env';
 
 export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   // Public paths that don't require authentication
   const publicPaths = ['/', '/login', '/register', '/choose-role', '/become-creator'];
-  const isPublic = publicPaths.some(p => pathname === p || pathname.startsWith('/api/'));
+  const isPublic = publicPaths.some(
+    (path) => pathname === path || pathname.startsWith('/api/')
+  );
 
-  // If it's a public path, just continue
   if (isPublic) {
     return NextResponse.next({ request });
   }
 
-  // For protected paths, try to get the session
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    // If no valid env vars, allow the request to proceed
-    if (!supabaseUrl || !supabaseAnonKey || !supabaseUrl.startsWith('http')) {
+    const env = tryGetSupabaseClientEnv();
+    if (!env) {
       return NextResponse.next({ request });
     }
 
     let supabaseResponse = NextResponse.next({ request });
 
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    const supabase = createServerClient(env.supabaseUrl, env.supabaseAnonKey, {
       cookies: {
-        getAll() { return request.cookies.getAll(); },
+        getAll() {
+          return request.cookies.getAll();
+        },
         setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           supabaseResponse = NextResponse.next({ request });
@@ -38,7 +38,9 @@ export async function updateSession(request: NextRequest) {
       },
     });
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
       const url = request.nextUrl.clone();
@@ -47,8 +49,8 @@ export async function updateSession(request: NextRequest) {
     }
 
     return supabaseResponse;
-  } catch (error) {
-    // If anything fails in middleware, just continue
+  } catch {
+    // If anything fails in middleware, just continue.
     return NextResponse.next({ request });
   }
 }

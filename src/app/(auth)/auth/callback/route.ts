@@ -1,26 +1,28 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
+import { tryGetSupabaseClientEnv } from '@/lib/supabase/env';
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
 
   if (code) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const env = tryGetSupabaseClientEnv();
 
-    if (supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http')) {
+    if (env) {
       try {
-        const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+        const supabase = createServerClient(env.supabaseUrl, env.supabaseAnonKey, {
           cookies: {
-            getAll() { return []; },
+            getAll() {
+              return [];
+            },
             setAll() {},
           },
         });
 
         await supabase.auth.exchangeCodeForSession(code);
-      } catch (e) {
-        console.error('Supabase auth error:', e);
+      } catch (error) {
+        console.error('Supabase auth error:', error);
       }
     }
   }
