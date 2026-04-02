@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import Image from "next/image";
 
 export default async function CreatorApplicationsPage() {
   const supabase = await createClient();
@@ -45,7 +46,13 @@ export default async function CreatorApplicationsPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex gap-4">
                       {campaign?.product?.image_url && (
-                        <img src={campaign.product.image_url} alt="" className="w-16 h-16 object-cover rounded" />
+                        <Image
+                          src={campaign.product.image_url}
+                          alt={campaign?.product?.title || "Product image"}
+                          width={64}
+                          height={64}
+                          className="w-16 h-16 object-cover rounded"
+                        />
                       )}
                       <div>
                         <h3 className="font-medium">{campaign?.title || 'Campaign'}</h3>

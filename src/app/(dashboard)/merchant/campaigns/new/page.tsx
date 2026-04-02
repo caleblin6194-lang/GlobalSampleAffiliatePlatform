@@ -10,12 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function NewCampaignPage() {
   const router = useRouter();
-  const supabase = createClient();
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
 
   useEffect(() => {
     const load = async () => {
+      const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
@@ -25,7 +25,7 @@ export default function NewCampaignPage() {
         .eq('status', 'active');
       setProducts(data || []);
     };
-    load();
+    void load();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,6 +33,7 @@ export default function NewCampaignPage() {
     setLoading(true);
     const form = e.target as HTMLFormElement;
     const fd = new FormData(form);
+    const supabase = createClient();
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.push('/login'); return; }

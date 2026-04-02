@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,7 +38,7 @@ const nextStatusLabels: Record<string, string> = {
 export default function VendorOrderDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const supabase = createClient();
+  const fulfillmentId = params.id as string;
 
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -50,19 +49,19 @@ export default function VendorOrderDetailPage() {
   const [carrier, setCarrier] = useState("");
   const [trackingNo, setTrackingNo] = useState("");
 
-  useEffect(() => {
-    fetchOrder();
-  }, [params.id]);
-
-  async function fetchOrder() {
-    const response = await fetch(`/api/fulfillment/${params.id}`);
+  const fetchOrder = useCallback(async () => {
+    const response = await fetch(`/api/fulfillment/${fulfillmentId}`);
     const data = await response.json();
 
     if (response.ok) {
       setOrder(data.order);
     }
     setLoading(false);
-  }
+  }, [fulfillmentId]);
+
+  useEffect(() => {
+    void fetchOrder();
+  }, [fetchOrder]);
 
   async function handleStatusUpdate(newStatus: string) {
     if (newStatus === 'shipped' && (!carrier || !trackingNo)) {
@@ -73,7 +72,7 @@ export default function VendorOrderDetailPage() {
     setUpdating(true);
     setError(null);
 
-    const response = await fetch(`/api/fulfillment/${params.id}`, {
+    const response = await fetch(`/api/fulfillment/${fulfillmentId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -85,7 +84,7 @@ export default function VendorOrderDetailPage() {
 
     if (response.ok) {
       router.refresh();
-      fetchOrder();
+      await fetchOrder();
     } else {
       const data = await response.json();
       setError(data.error || "Failed to update");

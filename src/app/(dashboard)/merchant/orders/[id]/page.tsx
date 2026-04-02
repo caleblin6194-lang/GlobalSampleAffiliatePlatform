@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,7 +20,7 @@ const statusColors: Record<string, "default" | "secondary" | "outline" | "destru
 export default function OrderDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const supabase = createClient();
+  const orderId = params.id as string;
 
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -29,12 +28,8 @@ export default function OrderDetailPage() {
   const [newStatus, setNewStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchOrder();
-  }, [params.id]);
-
-  async function fetchOrder() {
-    const response = await fetch(`/api/orders/${params.id}`);
+  const fetchOrder = useCallback(async () => {
+    const response = await fetch(`/api/orders/${orderId}`);
     const data = await response.json();
 
     if (response.ok) {
@@ -42,7 +37,11 @@ export default function OrderDetailPage() {
       setNewStatus(data.order.status);
     }
     setLoading(false);
-  }
+  }, [orderId]);
+
+  useEffect(() => {
+    void fetchOrder();
+  }, [fetchOrder]);
 
   async function handleUpdateStatus() {
     if (!newStatus || newStatus === order.status) return;
@@ -50,7 +49,7 @@ export default function OrderDetailPage() {
     setUpdating(true);
     setError(null);
 
-    const response = await fetch(`/api/orders/${params.id}`, {
+    const response = await fetch(`/api/orders/${orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: newStatus }),
@@ -58,7 +57,7 @@ export default function OrderDetailPage() {
 
     if (response.ok) {
       router.refresh();
-      fetchOrder();
+      await fetchOrder();
     } else {
       const data = await response.json();
       setError(data.error || "Failed to update order");

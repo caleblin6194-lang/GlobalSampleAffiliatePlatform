@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, ExternalLink, Globe, AlertCircle } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 const platformOptions = [
   "Instagram",
@@ -41,7 +42,7 @@ const statusLabels: Record<string, string> = {
 export default function TaskDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const supabase = createClient();
+  const taskId = params.id as string;
 
   const [task, setTask] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -58,11 +59,8 @@ export default function TaskDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchTask();
-  }, [params.id]);
-
-  async function fetchTask() {
+  const fetchTask = useCallback(async () => {
+    const supabase = createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -71,7 +69,7 @@ export default function TaskDetailPage() {
       return;
     }
 
-    const response = await fetch(`/api/tasks/${params.id}`);
+    const response = await fetch(`/api/tasks/${taskId}`);
     const data = await response.json();
 
     if (response.ok) {
@@ -91,7 +89,11 @@ export default function TaskDetailPage() {
       setError(data.error || "Failed to load task");
     }
     setLoading(false);
-  }
+  }, [router, taskId]);
+
+  useEffect(() => {
+    void fetchTask();
+  }, [fetchTask]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -123,7 +125,7 @@ export default function TaskDetailPage() {
 
     if (response.ok) {
       router.refresh();
-      fetchTask(); // Refresh to show updated status
+      await fetchTask(); // Refresh to show updated status
     } else {
       setSubmitError(data.error || "Failed to submit content");
     }
@@ -229,9 +231,11 @@ export default function TaskDetailPage() {
               <>
                 <div className="flex gap-4">
                   {product.image_url && (
-                    <img
+                    <Image
                       src={product.image_url}
                       alt={product.title}
+                      width={80}
+                      height={80}
                       className="w-20 h-20 object-cover rounded-md border"
                     />
                   )}

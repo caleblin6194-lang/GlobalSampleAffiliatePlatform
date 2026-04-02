@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ import {
   Check,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 const statusColors: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
   pending: "secondary",
@@ -29,7 +30,7 @@ const statusColors: Record<string, "default" | "secondary" | "outline" | "destru
 export default function ContentReviewPage() {
   const params = useParams();
   const router = useRouter();
-  const supabase = createClient();
+  const contentId = params.id as string;
 
   const [content, setContent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -41,11 +42,8 @@ export default function ContentReviewPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  useEffect(() => {
-    fetchContent();
-  }, [params.id]);
-
-  async function fetchContent() {
+  const fetchContent = useCallback(async () => {
+    const supabase = createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -54,7 +52,7 @@ export default function ContentReviewPage() {
       return;
     }
 
-    const response = await fetch(`/api/content/review?id=${params.id}`);
+    const response = await fetch(`/api/content/review?id=${contentId}`);
     const data = await response.json();
 
     if (response.ok) {
@@ -63,7 +61,11 @@ export default function ContentReviewPage() {
       setError(data.error || "Failed to load content");
     }
     setLoading(false);
-  }
+  }, [contentId, router]);
+
+  useEffect(() => {
+    void fetchContent();
+  }, [fetchContent]);
 
   async function handleReview(status: "approved" | "rejected") {
     if (status === "rejected" && !rejectionReason.trim()) {
@@ -295,9 +297,11 @@ export default function ContentReviewPage() {
               {product && (
                 <div className="flex gap-4">
                   {product.image_url && (
-                    <img
+                    <Image
                       src={product.image_url}
                       alt={product.title}
+                      width={64}
+                      height={64}
                       className="w-16 h-16 object-cover rounded-md border"
                     />
                   )}

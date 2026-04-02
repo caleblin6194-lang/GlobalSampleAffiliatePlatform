@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import Image from "next/image";
 
 export default async function TrackPage({
   params,
@@ -72,11 +73,15 @@ export default async function TrackPage({
         {product && (
           <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-8">
             {product.image_url && (
-              <img
-                src={product.image_url}
-                alt={product.title}
-                className="w-full h-64 object-cover"
-              />
+              <div className="relative w-full h-64">
+                <Image
+                  src={product.image_url}
+                  alt={product.title || "Product image"}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 768px"
+                />
+              </div>
             )}
             <div className="p-6">
               <h2 className="text-xl font-semibold mb-2">{product.title}</h2>

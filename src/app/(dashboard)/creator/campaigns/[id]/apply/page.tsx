@@ -7,17 +7,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import Image from "next/image";
 
 export default function ApplyCampaignPage() {
   const router = useRouter();
   const params = useParams();
   const campaignId = params.id as string;
-  const supabase = createClient();
   const [loading, setLoading] = useState(false);
   const [campaign, setCampaign] = useState<any>(null);
 
   useEffect(() => {
     const load = async () => {
+      const supabase = createClient();
       const { data } = await supabase
         .from('campaigns')
         .select(`
@@ -29,7 +30,7 @@ export default function ApplyCampaignPage() {
         .single();
       setCampaign(data);
     };
-    load();
+    void load();
   }, [campaignId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -37,6 +38,7 @@ export default function ApplyCampaignPage() {
     setLoading(true);
     const form = e.target as HTMLFormElement;
     const fd = new FormData(form);
+    const supabase = createClient();
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.push('/login'); return; }
@@ -85,7 +87,13 @@ export default function ApplyCampaignPage() {
         <CardContent className="p-4">
           <div className="flex items-center gap-4">
             {product?.image_url && (
-              <img src={product.image_url} alt={product.title} className="w-16 h-16 object-cover rounded" />
+              <Image
+                src={product.image_url}
+                alt={product.title || "Product image"}
+                width={64}
+                height={64}
+                className="w-16 h-16 object-cover rounded"
+              />
             )}
             <div>
               <p className="font-medium">{product?.title || 'Product'}</p>

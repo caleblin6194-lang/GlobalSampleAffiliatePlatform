@@ -13,7 +13,6 @@ import Link from "next/link";
 
 export default function NewOrderPage() {
   const router = useRouter();
-  const supabase = createClient();
 
   const [loading, setLoading] = useState(false);
   const [campaigns, setCampaigns] = useState<any[]>([]);
@@ -33,50 +32,53 @@ export default function NewOrderPage() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    fetchData();
+    const fetchData = async () => {
+      const supabase = createClient();
+      const { data: campaignsData } = await supabase
+        .from("campaigns")
+        .select("id, title, merchant_id")
+        .eq("status", "active");
+
+      if (campaignsData) {
+        setCampaigns(campaignsData);
+      }
+    };
+
+    void fetchData();
   }, []);
 
-  async function fetchData() {
-    // Get campaigns
-    const { data: campaignsData } = await supabase
-      .from("campaigns")
-      .select("id, title, merchant_id")
-      .eq("status", "active");
-
-    if (campaignsData) {
-      setCampaigns(campaignsData);
-    }
-  }
-
   useEffect(() => {
-    if (campaignId) {
-      fetchAffiliateData();
+    if (!campaignId) {
+      setAffiliateLinks([]);
+      setCoupons([]);
+      return;
     }
+
+    const fetchAffiliateData = async () => {
+      const supabase = createClient();
+      const { data: links } = await supabase
+        .from("affiliate_links")
+        .select("id, code, creator_id, creator:profiles!affiliate_links_creator_id_fkey(full_name)")
+        .eq("campaign_id", campaignId)
+        .eq("is_active", true);
+
+      if (links) {
+        setAffiliateLinks(links);
+      }
+
+      const { data: couponData } = await supabase
+        .from("coupon_codes")
+        .select("id, code, creator_id, creator:profiles!coupon_codes_creator_id_fkey(full_name)")
+        .eq("campaign_id", campaignId)
+        .eq("is_active", true);
+
+      if (couponData) {
+        setCoupons(couponData);
+      }
+    };
+
+    void fetchAffiliateData();
   }, [campaignId]);
-
-  async function fetchAffiliateData() {
-    // Get affiliate links for this campaign
-    const { data: links } = await supabase
-      .from("affiliate_links")
-      .select("id, code, creator_id, creator:profiles!affiliate_links_creator_id_fkey(full_name)")
-      .eq("campaign_id", campaignId)
-      .eq("is_active", true);
-
-    if (links) {
-      setAffiliateLinks(links);
-    }
-
-    // Get coupons for this campaign
-    const { data: couponData } = await supabase
-      .from("coupon_codes")
-      .select("id, code, creator_id, creator:profiles!coupon_codes_creator_id_fkey(full_name)")
-      .eq("campaign_id", campaignId)
-      .eq("is_active", true);
-
-    if (couponData) {
-      setCoupons(couponData);
-    }
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
