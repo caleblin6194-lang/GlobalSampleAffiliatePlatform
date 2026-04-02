@@ -2,15 +2,33 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+  const pathname = request.nextUrl.pathname;
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  // Public paths that don't require authentication
+  const publicPaths = ['/', '/login', '/register', '/choose-role', '/become-creator'];
+  const isPublic = publicPaths.some(p => pathname === p || pathname.startsWith('/api/'));
+
+  // If it's a public path, just continue
+  if (isPublic) {
+    return NextResponse.next({ request });
+  }
+
+  // For protected paths, try to get the session
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    // If no env vars, allow the request to proceed (for development)
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.next({ request });
+    }
+
+    let supabaseResponse = NextResponse.next({ request });
+
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() { return request.cookies.getAll(); },
-        setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
+        setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
@@ -18,46 +36,20 @@ export async function updateSession(request: NextRequest) {
           );
         },
       },
-    }
-  );
+    });
 
-  const { data: { user } } = await supabase.auth.getUser();
-  const pathname = request.nextUrl.pathname;
+    const { data: { user } } = await supabase.auth.getUser();
 
-  const publicPaths = ['/', '/login', '/register'];
-  const isPublic = publicPaths.includes(pathname);
-
-  if (!user && !isPublic) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    return NextResponse.redirect(url);
-  }
-
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    const role = profile?.role || 'creator';
-    const rolePaths: Record<string, string[]> = {
-      admin: ['/admin'],
-      merchant: ['/merchant'],
-      creator: ['/creator'],
-      vendor: ['/vendor'],
-      buyer: ['/buyer'],
-    };
-
-    const allowedPaths = rolePaths[role] || [];
-    const isAllowed = allowedPaths.some(p => pathname.startsWith(p));
-
-    if (!isAllowed && pathname !== '/') {
+    if (!user) {
       const url = request.nextUrl.clone();
-      url.pathname = `/${role}/dashboard`;
+      url.pathname = '/login';
       return NextResponse.redirect(url);
     }
-  }
 
-  return supabaseResponse;
+    return supabaseResponse;
+  } catch (error) {
+    // If anything fails in middleware, just continue
+    console.error('Middleware error:', error);
+    return NextResponse.next({ request });
+  }
 }
