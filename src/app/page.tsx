@@ -1,52 +1,113 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-5xl px-6 py-24">
-        <div className="text-center space-y-6">
-          <div className="flex justify-center">
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
-              Global Sample Affiliate Platform
-            </span>
-          </div>
-          <h1 className="text-5xl font-bold tracking-tight text-foreground">
-            Connect Brands with Creators
-          </h1>
-          <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
-            The platform where brands offer product samples, creators produce content,
-            and vendors supply the products — all in one ecosystem.
-          </p>
-          <div className="flex items-center justify-center gap-4 pt-4">
-            <Link
-              href="/login"
-              className="inline-flex items-center justify-center rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
-            >
-              Sign In
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 border-b bg-background/80 backdrop-blur-md">
+        <div className="container mx-auto flex h-16 items-center justify-between px-4">
+          <div className="text-xl font-bold tracking-tight">KOLINK</div>
+          <div className="flex items-center gap-4">
+            <Link href="/login">
+              <Button variant="ghost" size="sm">Login</Button>
             </Link>
-            <Link
-              href="/register"
-              className="inline-flex items-center justify-center rounded-lg border border-border bg-background px-6 py-3 text-sm font-medium text-foreground hover:bg-accent"
-            >
-              Create Account
+            <Link href="/register">
+              <Button size="sm">Sign Up</Button>
             </Link>
           </div>
         </div>
+      </header>
 
-        <div className="mt-24 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { role: 'admin', label: 'Administrator', desc: 'Platform management and oversight', color: 'text-red-500' },
-            { role: 'merchant', label: 'Brand Merchant', desc: 'Manage brands, products, and campaigns', color: 'text-blue-500' },
-            { role: 'creator', label: 'Content Creator', desc: 'Discover campaigns and request samples', color: 'text-purple-500' },
-            { role: 'vendor', label: 'Supplier Vendor', desc: 'Manage inventory and fulfill orders', color: 'text-green-500' },
-          ].map(({ role, label, desc, color }) => (
-            <div key={role} className="rounded-xl border bg-card p-6 shadow-sm">
-              <div className={`text-2xl font-bold ${color}`}>{label}</div>
-              <p className="mt-2 text-sm text-muted-foreground">{desc}</p>
-            </div>
-          ))}
+      {/* Hero Section */}
+      <section className="pt-32 pb-20 px-4">
+        <div className="container mx-auto max-w-4xl text-center">
+          <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
+            The Next Generation
+            <br />
+            <span className="text-primary">Creator Commerce</span> Platform
+          </h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10">
+            Connect with top creators, launch products, and grow your brand in the 3C
+            数码 accessories space.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/register?role=creator">
+              <Button size="lg" className="w-full sm:w-auto">
+                Start Free Test
+              </Button>
+            </Link>
+            <Link href="/register?role=creator">
+              <Button variant="outline" size="lg" className="w-full sm:w-auto">
+                Join as Creator
+              </Button>
+            </Link>
+          </div>
         </div>
-      </div>
+      </section>
+
+      {/* Roles Section */}
+      <section className="py-20 px-4 bg-secondary/30">
+        <div className="container mx-auto max-w-5xl">
+          <h2 className="text-3xl font-bold text-center mb-12">Choose Your Path</h2>
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Creator Card */}
+            <div className="rounded-xl border bg-card/80 backdrop-blur p-6 hover:border-primary/50 transition-all">
+              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                <span className="text-2xl">🎬</span>
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Creator</h3>
+              <p className="text-muted-foreground text-sm mb-4">
+                Get free samples, create content, and earn commissions
+              </p>
+              <Link href="/register?role=creator" className="block">
+                <Button variant="outline" className="w-full">
+                  Join as Creator
+                </Button>
+              </Link>
+            </div>
+
+            {/* Merchant Card */}
+            <div className="rounded-xl border bg-card/80 backdrop-blur p-6 hover:border-primary/50 transition-all">
+              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                <span className="text-2xl">🏪</span>
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Merchant</h3>
+              <p className="text-muted-foreground text-sm mb-4">
+                List products, recruit creators, and grow your business
+              </p>
+              <Link href="/register?role=merchant" className="block">
+                <Button variant="outline" className="w-full">
+                  Merchant Join
+                </Button>
+              </Link>
+            </div>
+
+            {/* Buyer Card */}
+            <div className="rounded-xl border bg-card/80 backdrop-blur p-6 hover:border-primary/50 transition-all">
+              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                <span className="text-2xl">🛒</span>
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Buyer</h3>
+              <p className="text-muted-foreground text-sm mb-4">
+                Use links and coupons to resell and earn commissions
+              </p>
+              <Link href="/register?role=buyer" className="block">
+                <Button variant="outline" className="w-full">
+                  Join as Buyer
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-8 px-4 border-t">
+        <div className="container mx-auto text-center text-sm text-muted-foreground">
+          <p>© 2024 Kolink. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
   );
 }
