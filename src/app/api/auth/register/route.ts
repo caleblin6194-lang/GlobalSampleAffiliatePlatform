@@ -31,6 +31,12 @@ function getErrorMessage(error: unknown): string {
   return 'Unknown error';
 }
 
+function normalizeHttpStatus(status: unknown, fallback = 500): number {
+  if (typeof status !== 'number' || !Number.isInteger(status)) return fallback;
+  if (status < 200 || status > 599) return fallback;
+  return status;
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as RegisterBody;
@@ -73,9 +79,16 @@ export async function POST(request: Request) {
     });
 
     if (error) {
+      const responseStatus = normalizeHttpStatus(error.status, 400);
       return NextResponse.json(
-        { ok: false, message: error.message, code: error.code ?? null, status: error.status ?? 400 },
-        { status: error.status ?? 400 }
+        {
+          ok: false,
+          message: error.message,
+          code: error.code ?? null,
+          status: responseStatus,
+          upstream_status: error.status ?? null,
+        },
+        { status: responseStatus }
       );
     }
 
