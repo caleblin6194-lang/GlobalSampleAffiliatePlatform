@@ -53,6 +53,52 @@ export default function CreatorChannelsPage() {
   const [handle, setHandle] = useState('');
   const [followers, setFollowers] = useState('0');
 
+  useEffect(() => {
+    const reportClientError = async (payload: Record<string, unknown>) => {
+      try {
+        await fetch('/api/client-errors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            source: 'creator/channels',
+            timestamp: new Date().toISOString(),
+            ...payload,
+          }),
+        });
+      } catch {
+        // Ignore reporting failures to avoid cascading client errors.
+      }
+    };
+
+    const onWindowError = (event: ErrorEvent) => {
+      void reportClientError({
+        type: 'error',
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        stack: event.error instanceof Error ? event.error.stack : null,
+      });
+    };
+
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      void reportClientError({
+        type: 'unhandledrejection',
+        message: reason instanceof Error ? reason.message : String(reason),
+        stack: reason instanceof Error ? reason.stack : null,
+      });
+    };
+
+    window.addEventListener('error', onWindowError);
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('error', onWindowError);
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
+    };
+  }, []);
+
   const loadChannels = useCallback(async () => {
     try {
       const response = await fetch('/api/creator/channels', {
