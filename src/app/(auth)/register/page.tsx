@@ -51,18 +51,25 @@ export default function RegisterPage() {
       };
 
       const attempts = [
-        { data: { full_name: nameValue, role: selectedRole } },
-        { data: { full_name: nameValue, requested_role: selectedRole } },
-        { data: { full_name: nameValue } },
+        { options: { ...baseOptions, data: { full_name: nameValue, role: selectedRole } } },
+        { options: { ...baseOptions, data: { full_name: nameValue, requested_role: selectedRole } } },
+        { options: { ...baseOptions, data: { full_name: nameValue } } },
+        { options: { ...baseOptions } },
+        { options: {} },
       ];
 
       let lastError: any = null;
       for (let i = 0; i < attempts.length; i += 1) {
-        const { data, error: signUpError } = await supabase.auth.signUp({
+        const payload: any = {
           email: emailValue,
           password: passwordValue,
-          options: { ...baseOptions, ...attempts[i] },
-        });
+        };
+
+        if (Object.keys(attempts[i].options).length > 0) {
+          payload.options = attempts[i].options;
+        }
+
+        const { data, error: signUpError } = await supabase.auth.signUp(payload);
 
         if (!signUpError) {
           return { data, error: null };
