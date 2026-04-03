@@ -37,15 +37,69 @@ export default function RegisterPage() {
     async (emailValue: string, passwordValue: string, nameValue: string) => {
       const supabase = createClient();
 
-      // Minimal signUp — strip all optional params to isolate the error
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: emailValue,
         password: passwordValue,
       });
 
-      return { data, error: signUpError };
+      if (!signUpError) {
+        return { data, error: null, usedServerFallback: false };
+      }
+
+      const shouldUseServerFallback = /argument name is invalid|参数名无效/i.test(
+        signUpError.message || ''
+      );
+
+      if (!shouldUseServerFallback) {
+        return { data: null, error: signUpError, usedServerFallback: false };
+      }
+
+      try {
+        const response = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: emailValue,
+            password: passwordValue,
+            fullName: nameValue,
+            role,
+          }),
+        });
+
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok || !payload.ok) {
+          return {
+            data: null,
+            error: {
+              message: payload.message || signUpError.message || 'Registration failed.',
+            },
+            usedServerFallback: true,
+          };
+        }
+
+        return {
+          data: {
+            user: payload.userId
+              ? {
+                  id: payload.userId,
+                  email: emailValue,
+                  confirmation_sent_at: payload.needsEmailConfirmation
+                    ? new Date().toISOString()
+                    : null,
+                }
+              : null,
+          },
+          error: null,
+          usedServerFallback: true,
+        };
+      } catch {
+        return { data: null, error: signUpError, usedServerFallback: false };
+      }
     },
-    []
+    [role]
   );
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -55,7 +109,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const { data, error: signUpError } = await signUpWithFallback(
+      const { data, error: signUpError, usedServerFallback } = await signUpWithFallback(
         email,
         password,
         fullName
@@ -70,23 +124,25 @@ export default function RegisterPage() {
       // Check if user was created successfully
       if (data?.user) {
         // Create profile with the selected role (after auth user is created)
-        const supabase = createClient();
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: data.user.id,
-            email: email,
-            full_name: fullName,
-            role: role,
-          });
+        if (!usedServerFallback) {
+          const supabase = createClient();
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: data.user.id,
+              email: email,
+              full_name: fullName,
+              role: role,
+            });
 
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-          // Don't block signup for profile errors — user can be created without profile
+          if (profileError) {
+            console.error('Profile creation error:', profileError);
+            // Don't block signup for profile errors — user can be created without profile
+          }
         }
 
         // Check if email confirmation is required
-        if (data.user.confirmation_sent_at) {
+        if (usedServerFallback || data.user.confirmation_sent_at) {
           setSuccess(true);
           setLoading(false);
           return;

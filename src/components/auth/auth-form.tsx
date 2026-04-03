@@ -37,17 +37,25 @@ export function AuthForm({ mode }: AuthFormProps) {
       router.push('/');
       router.refresh();
     } else {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: { full_name: fullName, role },
-        },
       });
       if (error) {
         setError(error.message);
         setLoading(false);
         return;
+      }
+      if (data?.user) {
+        const { error: profileError } = await supabase.from('profiles').insert({
+          id: data.user.id,
+          email,
+          full_name: fullName,
+          role,
+        });
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+        }
       }
       router.push('/login');
     }
