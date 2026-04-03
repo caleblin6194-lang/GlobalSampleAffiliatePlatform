@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getSupabaseClientEnv } from '@/lib/supabase/env';
+import { tryGetSupabaseClientEnv } from '@/lib/supabase/env';
 
 const VALID_ROLES = new Set(['creator', 'merchant', 'vendor', 'buyer']);
 
@@ -21,6 +21,16 @@ function sanitizeRole(value: unknown): string {
   return VALID_ROLES.has(role) ? role : 'creator';
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  return 'Unknown error';
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as RegisterBody;
@@ -36,7 +46,20 @@ export async function POST(request: Request) {
       );
     }
 
-    const { supabaseUrl, supabaseAnonKey } = getSupabaseClientEnv();
+    const env = tryGetSupabaseClientEnv();
+    if (!env) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            'Supabase config is invalid on server. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel and redeploy.',
+          code: 'supabase_env_invalid',
+        },
+        { status: 500 }
+      );
+    }
+
+    const { supabaseUrl, supabaseAnonKey } = env;
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         autoRefreshToken: false,
@@ -77,9 +100,24 @@ export async function POST(request: Request) {
       needsEmailConfirmation: Boolean(data?.user?.confirmation_sent_at),
     });
   } catch (error) {
+    const message = getErrorMessage(error);
+    const lower = message.toLowerCase();
+    let userMessage = message;
+    let code = 'register_api_error';
+
+    if (lower.includes('fetch failed') || lower.includes('enotfound')) {
+      userMessage =
+        'Server cannot reach Supabase. Check NEXT_PUBLIC_SUPABASE_URL and your deployment network.';
+      code = 'supabase_unreachable';
+    } else if (lower.includes('invalid supabase config')) {
+      userMessage =
+        'Supabase config is invalid on server. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel and redeploy.';
+      code = 'supabase_env_invalid';
+    }
+
     console.error('Register API error:', error);
     return NextResponse.json(
-      { ok: false, message: 'Registration failed. Please try again.' },
+      { ok: false, message: userMessage, code },
       { status: 500 }
     );
   }
