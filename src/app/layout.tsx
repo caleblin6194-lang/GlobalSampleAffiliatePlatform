@@ -7,11 +7,14 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Global Sample Affiliate Platform",
   description: "Connect brands, creators, and vendors worldwide",
+  other: {
+    google: "notranslate",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" translate="no" className="notranslate">
       <body className={inter.className}>{children}</body>
     </html>
   );

@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Video, Plus, Loader2 } from 'lucide-react';
 
 type Channel = {
+  id: string;
   platform: string;
   handle: string;
   followers: number;
@@ -25,6 +26,9 @@ function normalizeChannels(input: unknown): Channel[] {
     const item = row as Record<string, unknown>;
     const platform = typeof item.platform === 'string' ? item.platform : 'Unknown';
     const handle = typeof item.handle === 'string' ? item.handle : '';
+    const id = typeof item.id === 'string' && item.id.trim().length > 0
+      ? item.id
+      : `${platform}:${handle}`;
     const followersRaw = item.followers;
     const followersNumber =
       typeof followersRaw === 'number'
@@ -35,6 +39,7 @@ function normalizeChannels(input: unknown): Channel[] {
 
     return [
       {
+        id,
         platform,
         handle,
         followers: Number.isFinite(followersNumber) ? Math.max(0, Math.trunc(followersNumber)) : 0,
@@ -179,7 +184,7 @@ export default function CreatorChannelsPage() {
   const totalFollowers = channels.reduce((sum, ch) => sum + (Number(ch.followers) || 0), 0);
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="max-w-4xl space-y-6 notranslate" translate="no">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">My Channels</h1>
@@ -269,8 +274,8 @@ export default function CreatorChannelsPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {channels.map((channel, idx) => (
-                <div key={`${channel.platform}-${channel.handle}-${idx}`} className="flex items-center gap-3 rounded-lg border p-3">
+              {channels.map((channel) => (
+                <div key={channel.id} className="flex items-center gap-3 rounded-lg border p-3">
                   <div className="rounded-full bg-primary/10 p-2">
                     <Video className="h-4 w-4 text-primary" />
                   </div>

@@ -39,7 +39,7 @@ export async function GET() {
 
     const { data, error } = await supabase
       .from('creator_channels')
-      .select('platform, handle, followers')
+      .select('id, platform, handle, followers')
       .eq('creator_id', user.id)
       .order('followers', { ascending: false });
 
