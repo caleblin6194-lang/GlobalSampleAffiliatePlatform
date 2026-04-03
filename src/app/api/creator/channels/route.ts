@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server';
+import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 type ChannelBody = {
   platform?: unknown;
   handle?: unknown;
   followers?: unknown;
 };
+
+type EnsureProfileResult =
+  | { ok: true }
+  | { ok: false; status: number; message: string };
 
 function normalizeText(value: unknown): string {
   if (typeof value !== 'string') return '';
@@ -25,6 +31,77 @@ function normalizeFollowers(value: unknown): number {
   return 0;
 }
 
+function getUserFullName(user: User): string {
+  if (!user.user_metadata || typeof user.user_metadata !== 'object') {
+    return '';
+  }
+
+  const metadata = user.user_metadata as Record<string, unknown>;
+  const fullName = normalizeText(metadata.full_name);
+  if (fullName) return fullName;
+
+  const name = normalizeText(metadata.name);
+  if (name) return name;
+
+  return '';
+}
+
+async function ensureProfileExists(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  user: User
+): Promise<EnsureProfileResult> {
+  const { data: existingProfile, error: existingError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (existingError) {
+    return {
+      ok: false,
+      status: 500,
+      message: `Failed to verify profile: ${existingError.message}`,
+    };
+  }
+
+  if (existingProfile) {
+    return { ok: true };
+  }
+
+  const adminClient = createAdminClient();
+  if (!adminClient) {
+    return {
+      ok: false,
+      status: 500,
+      message:
+        'Profile is missing. Configure SUPABASE_SERVICE_ROLE_KEY in Vercel so the server can auto-create profiles, then redeploy.',
+    };
+  }
+
+  const email = user.email ?? `${user.id}@missing-email.local`;
+  const fullName = getUserFullName(user) || null;
+
+  const { error: upsertError } = await adminClient.from('profiles').upsert(
+    {
+      id: user.id,
+      email,
+      full_name: fullName,
+      role: 'creator',
+    },
+    { onConflict: 'id' }
+  );
+
+  if (upsertError) {
+    return {
+      ok: false,
+      status: 500,
+      message: `Failed to create profile: ${upsertError.message}`,
+    };
+  }
+
+  return { ok: true };
+}
+
 export async function GET() {
   try {
     const supabase = await createClient();
@@ -35,6 +112,14 @@ export async function GET() {
 
     if (userError || !user) {
       return NextResponse.json({ ok: false, message: 'Unauthorized' }, { status: 401 });
+    }
+
+    const profileResult = await ensureProfileExists(supabase, user);
+    if (!profileResult.ok) {
+      return NextResponse.json(
+        { ok: false, message: profileResult.message },
+        { status: profileResult.status }
+      );
     }
 
     const { data, error } = await supabase
@@ -64,6 +149,14 @@ export async function POST(request: Request) {
 
     if (userError || !user) {
       return NextResponse.json({ ok: false, message: 'Unauthorized' }, { status: 401 });
+    }
+
+    const profileResult = await ensureProfileExists(supabase, user);
+    if (!profileResult.ok) {
+      return NextResponse.json(
+        { ok: false, message: profileResult.message },
+        { status: profileResult.status }
+      );
     }
 
     const body = (await request.json()) as ChannelBody;

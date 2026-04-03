@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { tryGetSupabaseClientEnv } from '@/lib/supabase/env';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 const VALID_ROLES = new Set(['creator', 'merchant', 'vendor', 'buyer']);
 
@@ -93,17 +94,33 @@ export async function POST(request: Request) {
     }
 
     if (data?.user?.id) {
-      const { error: profileError } = await supabase.from('profiles').insert({
+      const profilePayload = {
         id: data.user.id,
         email,
-        full_name: fullName,
+        full_name: fullName || null,
         role,
-      });
+      };
 
-      if (profileError) {
-        // Profile creation may fail when RLS blocks anonymous inserts.
-        // Do not fail signup in this case.
-        console.error('Profile creation warning:', profileError);
+      const adminClient = createAdminClient();
+      if (adminClient) {
+        const { error: profileError } = await adminClient
+          .from('profiles')
+          .upsert(profilePayload, { onConflict: 'id' });
+
+        if (profileError) {
+          console.error('Profile upsert warning:', profileError);
+        }
+      } else {
+        const { error: profileError } = await supabase.from('profiles').insert(profilePayload);
+
+        if (profileError) {
+          // Fallback insert may fail when RLS blocks anonymous inserts.
+          // Do not fail signup in this case.
+          console.error(
+            'Profile creation warning: fallback insert failed (likely RLS) and SUPABASE_SERVICE_ROLE_KEY is missing.',
+            profileError
+          );
+        }
       }
     }
 
