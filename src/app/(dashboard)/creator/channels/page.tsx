@@ -29,31 +29,37 @@ export default function CreatorChannelsPage() {
   const [followers, setFollowers] = useState('0');
 
   const loadChannels = useCallback(async () => {
-    const supabase = createClient();
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-    if (userError || !user) {
-      router.push('/login');
-      return;
-    }
+      if (userError || !user) {
+        router.push('/login');
+        return;
+      }
 
-    const { data, error: listError } = await supabase
-      .from('creator_channels')
-      .select('platform, handle, followers')
-      .eq('creator_id', user.id)
-      .order('followers', { ascending: false });
+      const { data, error: listError } = await supabase
+        .from('creator_channels')
+        .select('platform, handle, followers')
+        .eq('creator_id', user.id)
+        .order('followers', { ascending: false });
 
-    if (listError) {
-      setError(listError.message || 'Failed to load channels.');
+      if (listError) {
+        setError(listError.message || 'Failed to load channels.');
+        setLoading(false);
+        return;
+      }
+
+      setChannels((data as Channel[]) || []);
       setLoading(false);
-      return;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to load channels.';
+      setError(message);
+      setLoading(false);
     }
-
-    setChannels((data as Channel[]) || []);
-    setLoading(false);
   }, [router]);
 
   useEffect(() => {
@@ -66,42 +72,46 @@ export default function CreatorChannelsPage() {
       setError('');
       setSubmitting(true);
 
-      const supabase = createClient();
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
 
-      if (userError || !user) {
-        router.push('/login');
-        return;
-      }
+        if (userError || !user) {
+          router.push('/login');
+          return;
+        }
 
-      const normalizedFollowers = Number.parseInt(followers, 10);
-      const payload = {
-        creator_id: user.id,
-        platform,
-        handle: handle.trim(),
-        followers: Number.isNaN(normalizedFollowers) ? 0 : Math.max(0, normalizedFollowers),
-      };
+        const normalizedFollowers = Number.parseInt(followers, 10);
+        const payload = {
+          creator_id: user.id,
+          platform,
+          handle: handle.trim(),
+          followers: Number.isNaN(normalizedFollowers) ? 0 : Math.max(0, normalizedFollowers),
+        };
 
-      if (!payload.handle) {
-        setError('Please enter your channel handle.');
+        if (!payload.handle) {
+          setError('Please enter your channel handle.');
+          return;
+        }
+
+        const { error: insertError } = await supabase.from('creator_channels').insert(payload);
+        if (insertError) {
+          setError(insertError.message || 'Failed to add channel.');
+          return;
+        }
+
+        setHandle('');
+        setFollowers('0');
+        await loadChannels();
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to add channel.';
+        setError(message);
+      } finally {
         setSubmitting(false);
-        return;
       }
-
-      const { error: insertError } = await supabase.from('creator_channels').insert(payload);
-      if (insertError) {
-        setError(insertError.message || 'Failed to add channel.');
-        setSubmitting(false);
-        return;
-      }
-
-      setHandle('');
-      setFollowers('0');
-      await loadChannels();
-      setSubmitting(false);
     },
     [followers, handle, loadChannels, platform, router]
   );
@@ -209,7 +219,7 @@ export default function CreatorChannelsPage() {
                     <p className="text-xs text-muted-foreground truncate">{channel.handle}</p>
                   </div>
                   <p className="text-sm font-medium">
-                    {(channel.followers || 0).toLocaleString()} followers
+                    {(Number(channel.followers) || 0).toLocaleString()} followers
                   </p>
                 </div>
               ))}
