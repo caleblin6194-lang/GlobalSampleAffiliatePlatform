@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,10 +12,36 @@ import { Video, Plus, Loader2 } from 'lucide-react';
 type Channel = {
   platform: string;
   handle: string;
-  followers: number | null;
+  followers: number;
 };
 
 const PLATFORM_OPTIONS = ['TikTok', 'Instagram', 'YouTube', 'Xiaohongshu', 'Other'];
+
+function normalizeChannels(input: unknown): Channel[] {
+  if (!Array.isArray(input)) return [];
+
+  return input.flatMap((row) => {
+    if (!row || typeof row !== 'object') return [];
+    const item = row as Record<string, unknown>;
+    const platform = typeof item.platform === 'string' ? item.platform : 'Unknown';
+    const handle = typeof item.handle === 'string' ? item.handle : '';
+    const followersRaw = item.followers;
+    const followersNumber =
+      typeof followersRaw === 'number'
+        ? followersRaw
+        : typeof followersRaw === 'string'
+        ? Number.parseInt(followersRaw, 10)
+        : 0;
+
+    return [
+      {
+        platform,
+        handle,
+        followers: Number.isFinite(followersNumber) ? Math.max(0, Math.trunc(followersNumber)) : 0,
+      },
+    ];
+  });
+}
 
 export default function CreatorChannelsPage() {
   const router = useRouter();
@@ -30,30 +55,25 @@ export default function CreatorChannelsPage() {
 
   const loadChannels = useCallback(async () => {
     try {
-      const supabase = createClient();
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+      const response = await fetch('/api/creator/channels', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const payload = await response.json().catch(() => ({} as Record<string, unknown>));
 
-      if (userError || !user) {
+      if (response.status === 401) {
         router.push('/login');
         return;
       }
 
-      const { data, error: listError } = await supabase
-        .from('creator_channels')
-        .select('platform, handle, followers')
-        .eq('creator_id', user.id)
-        .order('followers', { ascending: false });
-
-      if (listError) {
-        setError(listError.message || 'Failed to load channels.');
+      if (!response.ok || !payload.ok) {
+        const message = typeof payload.message === 'string' ? payload.message : 'Failed to load channels.';
+        setError(message);
         setLoading(false);
         return;
       }
 
-      setChannels((data as Channel[]) || []);
+      setChannels(normalizeChannels(payload.channels));
       setLoading(false);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load channels.';
@@ -73,33 +93,27 @@ export default function CreatorChannelsPage() {
       setSubmitting(true);
 
       try {
-        const supabase = createClient();
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
+        const response = await fetch('/api/creator/channels', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            platform,
+            handle: handle.trim(),
+            followers,
+          }),
+        });
+        const payload = await response.json().catch(() => ({} as Record<string, unknown>));
 
-        if (userError || !user) {
+        if (response.status === 401) {
           router.push('/login');
           return;
         }
 
-        const normalizedFollowers = Number.parseInt(followers, 10);
-        const payload = {
-          creator_id: user.id,
-          platform,
-          handle: handle.trim(),
-          followers: Number.isNaN(normalizedFollowers) ? 0 : Math.max(0, normalizedFollowers),
-        };
-
-        if (!payload.handle) {
-          setError('Please enter your channel handle.');
-          return;
-        }
-
-        const { error: insertError } = await supabase.from('creator_channels').insert(payload);
-        if (insertError) {
-          setError(insertError.message || 'Failed to add channel.');
+        if (!response.ok || !payload.ok) {
+          const message = typeof payload.message === 'string' ? payload.message : 'Failed to add channel.';
+          setError(message);
           return;
         }
 
@@ -116,7 +130,7 @@ export default function CreatorChannelsPage() {
     [followers, handle, loadChannels, platform, router]
   );
 
-  const totalFollowers = channels.reduce((sum, ch) => sum + (ch.followers || 0), 0);
+  const totalFollowers = channels.reduce((sum, ch) => sum + (Number(ch.followers) || 0), 0);
 
   return (
     <div className="max-w-4xl space-y-6">
