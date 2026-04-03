@@ -3,8 +3,25 @@ type SupabaseEnv = {
   supabaseAnonKey: string;
 };
 
+function extractEnvValueFromBlob(raw: string, keys: string[]): string | null {
+  const lines = raw.split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)=([\s\S]*)$/);
+    if (!match) continue;
+    const key = match[1].toUpperCase();
+    if (keys.includes(key)) {
+      return match[2].trim();
+    }
+  }
+  return null;
+}
+
 function stripLeadingEnvAssignment(raw: string, keys: string[]): string {
   const trimmed = raw.trim();
+  const fromBlob = extractEnvValueFromBlob(trimmed, keys);
+  if (fromBlob) return fromBlob;
   const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)=([\s\S]*)$/);
   if (!match) return trimmed;
   const key = match[1].toUpperCase();
@@ -32,9 +49,19 @@ function normalizeSupabaseUrl(rawUrl?: string): string | null {
   value = stripWrappingQuotes(value).replace(/\s+/g, '');
   if (!value) return null;
 
+  const explicitUrl = value.match(/https?:\/\/[^\s'"]+/i);
+  if (explicitUrl) {
+    value = explicitUrl[0];
+  }
+
   // Allow environment values like "project-ref.supabase.co"
   if (!/^https?:\/\//i.test(value)) {
-    value = `https://${value}`;
+    const hostMatch = value.match(/[a-z0-9-]+\.supabase\.co/i);
+    if (hostMatch) {
+      value = `https://${hostMatch[0]}`;
+    } else {
+      value = `https://${value}`;
+    }
   }
 
   try {
@@ -50,9 +77,16 @@ function normalizeSupabaseUrl(rawUrl?: string): string | null {
 
 function normalizeAnonKey(rawKey?: string): string | null {
   if (!rawKey) return null;
-  const value = stripWrappingQuotes(
+  let value = stripWrappingQuotes(
     stripLeadingEnvAssignment(rawKey, ['NEXT_PUBLIC_SUPABASE_ANON_KEY'])
   ).replace(/\s+/g, '');
+  if (!value) return null;
+
+  const envBlobKey = extractEnvValueFromBlob(rawKey, ['NEXT_PUBLIC_SUPABASE_ANON_KEY']);
+  if (envBlobKey) {
+    value = stripWrappingQuotes(envBlobKey).replace(/\s+/g, '');
+  }
+
   return value || null;
 }
 
