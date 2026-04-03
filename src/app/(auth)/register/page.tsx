@@ -37,14 +37,10 @@ export default function RegisterPage() {
     async (emailValue: string, passwordValue: string, nameValue: string) => {
       const supabase = createClient();
 
-      // Sign up with only full_name in metadata — no role to avoid invalid param errors
+      // Minimal signUp — strip all optional params to isolate the error
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: emailValue,
         password: passwordValue,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-          data: { full_name: nameValue },
-        },
       });
 
       return { data, error: signUpError };
