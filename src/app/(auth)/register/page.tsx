@@ -13,16 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 const VALID_ROLES = ['creator', 'merchant', 'vendor', 'buyer'] as const;
 type Role = typeof VALID_ROLES[number];
 
-function isInvalidParamError(message?: string) {
-  if (!message) return false;
-  const normalized = message.toLowerCase();
-  return (
-    normalized.includes('invalid parameter') ||
-    normalized.includes('invalid name') ||
-    message.includes('参数名无效')
-  );
-}
-
 function getDashboardPath(role: string): string {
   switch (role) {
     case 'merchant': return '/merchant/dashboard';
@@ -44,43 +34,20 @@ export default function RegisterPage() {
   const router = useRouter();
 
   const signUpWithFallback = useCallback(
-    async (emailValue: string, passwordValue: string, nameValue: string, selectedRole: Role) => {
+    async (emailValue: string, passwordValue: string, nameValue: string) => {
       const supabase = createClient();
-      const baseOptions = {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      };
 
-      const attempts = [
-        { options: { ...baseOptions, data: { full_name: nameValue, role: selectedRole } } },
-        { options: { ...baseOptions, data: { full_name: nameValue, requested_role: selectedRole } } },
-        { options: { ...baseOptions, data: { full_name: nameValue } } },
-        { options: { ...baseOptions } },
-        { options: {} },
-      ];
+      // Sign up with only full_name in metadata — no role to avoid invalid param errors
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: emailValue,
+        password: passwordValue,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: { full_name: nameValue },
+        },
+      });
 
-      let lastError: any = null;
-      for (let i = 0; i < attempts.length; i += 1) {
-        const payload: any = {
-          email: emailValue,
-          password: passwordValue,
-        };
-
-        if (Object.keys(attempts[i].options).length > 0) {
-          payload.options = attempts[i].options;
-        }
-
-        const { data, error: signUpError } = await supabase.auth.signUp(payload);
-
-        if (!signUpError) {
-          return { data, error: null };
-        }
-
-        lastError = signUpError;
-        const shouldRetry = i < attempts.length - 1 && isInvalidParamError(signUpError.message);
-        if (!shouldRetry) break;
-      }
-
-      return { data: null, error: lastError };
+      return { data, error: signUpError };
     },
     []
   );
@@ -95,8 +62,7 @@ export default function RegisterPage() {
       const { data, error: signUpError } = await signUpWithFallback(
         email,
         password,
-        fullName,
-        role
+        fullName
       );
 
       if (signUpError) {
@@ -107,6 +73,22 @@ export default function RegisterPage() {
 
       // Check if user was created successfully
       if (data?.user) {
+        // Create profile with the selected role (after auth user is created)
+        const supabase = createClient();
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: data.user.id,
+            email: email,
+            full_name: fullName,
+            role: role,
+          });
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+          // Don't block signup for profile errors — user can be created without profile
+        }
+
         // Check if email confirmation is required
         if (data.user.confirmation_sent_at) {
           setSuccess(true);
