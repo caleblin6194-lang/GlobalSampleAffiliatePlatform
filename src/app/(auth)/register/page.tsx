@@ -2,8 +2,6 @@
 
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,16 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 const VALID_ROLES = ['creator', 'merchant', 'vendor', 'buyer'] as const;
 type Role = typeof VALID_ROLES[number];
 
-function getDashboardPath(role: string): string {
-  switch (role) {
-    case 'merchant': return '/merchant/dashboard';
-    case 'creator': return '/creator/dashboard';
-    case 'vendor': return '/vendor/dashboard';
-    case 'buyer': return '/buyer/dashboard';
-    default: return '/login';
-  }
-}
-
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,31 +19,9 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const signUpWithFallback = useCallback(
     async (emailValue: string, passwordValue: string, nameValue: string) => {
-      const supabase = createClient();
-
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: emailValue,
-        password: passwordValue,
-      });
-
-      if (!signUpError) {
-        return { data, error: null, usedServerFallback: false };
-      }
-
-      const signUpErrorStatus = (signUpError as { status?: number } | null)?.status;
-      const shouldUseServerFallback =
-        /argument name is invalid|参数名无效|failed to fetch|network request failed/i.test(
-          signUpError.message || ''
-        ) || signUpErrorStatus === 0;
-
-      if (!shouldUseServerFallback) {
-        return { data: null, error: signUpError, usedServerFallback: false };
-      }
-
       try {
         const response = await fetch('/api/auth/register', {
           method: 'POST',
@@ -76,7 +42,7 @@ export default function RegisterPage() {
           return {
             data: null,
             error: {
-              message: payload.message || signUpError.message || 'Registration failed.',
+              message: payload.message || 'Registration failed.',
             },
             usedServerFallback: true,
           };
@@ -93,12 +59,17 @@ export default function RegisterPage() {
                     : null,
                 }
               : null,
+            needsEmailConfirmation: Boolean(payload.needsEmailConfirmation),
           },
           error: null,
           usedServerFallback: true,
         };
       } catch {
-        return { data: null, error: signUpError, usedServerFallback: false };
+        return {
+          data: null,
+          error: { message: 'Network error while registering. Please try again.' },
+          usedServerFallback: true,
+        };
       }
     },
     [role]
@@ -111,7 +82,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const { data, error: signUpError, usedServerFallback } = await signUpWithFallback(
+      const { data, error: signUpError } = await signUpWithFallback(
         email,
         password,
         fullName
@@ -124,34 +95,10 @@ export default function RegisterPage() {
       }
 
       // Check if user was created successfully
-      if (data?.user) {
-        // Create profile with the selected role (after auth user is created)
-        if (!usedServerFallback) {
-          const supabase = createClient();
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert({
-              id: data.user.id,
-              email: email,
-              full_name: fullName,
-              role: role,
-            });
-
-          if (profileError) {
-            console.error('Profile creation error:', profileError);
-            // Don't block signup for profile errors — user can be created without profile
-          }
-        }
-
-        // Check if email confirmation is required
-        if (usedServerFallback || data.user.confirmation_sent_at) {
-          setSuccess(true);
-          setLoading(false);
-          return;
-        }
-
-        // If no confirmation needed, redirect to dashboard
-        router.push(getDashboardPath(role));
+      if (data?.user || data?.needsEmailConfirmation) {
+        setSuccess(true);
+        setLoading(false);
+        return;
       } else {
         // User might need email confirmation
         setSuccess(true);
@@ -162,7 +109,7 @@ export default function RegisterPage() {
       setError(err.message || 'An unexpected error occurred. Please try again.');
       setLoading(false);
     }
-  }, [email, password, fullName, role, router, signUpWithFallback]);
+  }, [email, password, fullName, signUpWithFallback]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">

@@ -37,64 +37,33 @@ export function AuthForm({ mode }: AuthFormProps) {
       router.push('/');
       router.refresh();
     } else {
-      let usedServerFallback = false;
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-      if (error) {
-        const errorStatus = (error as { status?: number } | null)?.status;
-        const shouldUseServerFallback =
-          /argument name is invalid|参数名无效|failed to fetch|network request failed/i.test(
-            error.message || ''
-          ) || errorStatus === 0;
-
-        if (!shouldUseServerFallback) {
-          setError(error.message);
-          setLoading(false);
-          return;
-        }
-
-        try {
-          const response = await fetch('/api/auth/register', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              email,
-              password,
-              fullName,
-              role,
-            }),
-          });
-
-          const payload = await response.json().catch(() => ({}));
-          if (!response.ok || !payload.ok) {
-            setError(payload.message || error.message || 'Registration failed.');
-            setLoading(false);
-            return;
-          }
-
-          usedServerFallback = true;
-        } catch {
-          setError(error.message || 'Registration failed.');
-          setLoading(false);
-          return;
-        }
-      }
-      if (data?.user && !usedServerFallback) {
-        const { error: profileError } = await supabase.from('profiles').insert({
-          id: data.user.id,
-          email,
-          full_name: fullName,
-          role,
+      try {
+        const response = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email,
+            password,
+            fullName,
+            role,
+          }),
         });
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.ok) {
+          setError(payload.message || 'Registration failed.');
+          setLoading(false);
+          return;
         }
+
+        router.push('/login');
+      } catch {
+        setError('Network error while registering. Please try again.');
+        setLoading(false);
+        return;
       }
-      router.push('/login');
     }
   };
 
