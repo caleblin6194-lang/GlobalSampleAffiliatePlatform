@@ -3,6 +3,17 @@ type SupabaseEnv = {
   supabaseAnonKey: string;
 };
 
+function stripLeadingEnvAssignment(raw: string, keys: string[]): string {
+  const trimmed = raw.trim();
+  const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)=([\s\S]*)$/);
+  if (!match) return trimmed;
+  const key = match[1].toUpperCase();
+  if (keys.includes(key)) {
+    return match[2].trim();
+  }
+  return trimmed;
+}
+
 function stripWrappingQuotes(value: string): string {
   const trimmed = value.trim();
   if (
@@ -17,7 +28,8 @@ function stripWrappingQuotes(value: string): string {
 function normalizeSupabaseUrl(rawUrl?: string): string | null {
   if (!rawUrl) return null;
 
-  let value = stripWrappingQuotes(rawUrl).replace(/\s+/g, '');
+  let value = stripLeadingEnvAssignment(rawUrl, ['NEXT_PUBLIC_SUPABASE_URL']);
+  value = stripWrappingQuotes(value).replace(/\s+/g, '');
   if (!value) return null;
 
   // Allow environment values like "project-ref.supabase.co"
@@ -38,7 +50,9 @@ function normalizeSupabaseUrl(rawUrl?: string): string | null {
 
 function normalizeAnonKey(rawKey?: string): string | null {
   if (!rawKey) return null;
-  const value = stripWrappingQuotes(rawKey).replace(/\s+/g, '');
+  const value = stripWrappingQuotes(
+    stripLeadingEnvAssignment(rawKey, ['NEXT_PUBLIC_SUPABASE_ANON_KEY'])
+  ).replace(/\s+/g, '');
   return value || null;
 }
 
