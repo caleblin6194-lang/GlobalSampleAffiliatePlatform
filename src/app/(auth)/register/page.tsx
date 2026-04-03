@@ -46,9 +46,11 @@ export default function RegisterPage() {
         return { data, error: null, usedServerFallback: false };
       }
 
-      const shouldUseServerFallback = /argument name is invalid|参数名无效/i.test(
-        signUpError.message || ''
-      );
+      const signUpErrorStatus = (signUpError as { status?: number } | null)?.status;
+      const shouldUseServerFallback =
+        /argument name is invalid|参数名无效|failed to fetch|network request failed/i.test(
+          signUpError.message || ''
+        ) || signUpErrorStatus === 0;
 
       if (!shouldUseServerFallback) {
         return { data: null, error: signUpError, usedServerFallback: false };
