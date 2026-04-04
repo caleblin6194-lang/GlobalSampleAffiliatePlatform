@@ -93,7 +93,12 @@ export async function POST(request: Request) {
       );
     }
 
-    if (data?.user?.id) {
+    const isLikelyExistingUser = Boolean(
+      data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0
+    );
+    const alreadyConfirmed = Boolean(data?.user?.email_confirmed_at);
+
+    if (data?.user?.id && !isLikelyExistingUser) {
       const profilePayload = {
         id: data.user.id,
         email,
@@ -138,6 +143,8 @@ export async function POST(request: Request) {
       ok: true,
       userId: data?.user?.id ?? null,
       needsEmailConfirmation: Boolean(data?.user?.confirmation_sent_at),
+      existingAccount: isLikelyExistingUser,
+      alreadyConfirmed,
     });
   } catch (error) {
     const message = getErrorMessage(error);

@@ -11,6 +11,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const VALID_ROLES = ['creator', 'merchant', 'vendor', 'buyer'] as const;
 type Role = typeof VALID_ROLES[number];
+type SignUpResult = {
+  user: {
+    id: string;
+    email: string;
+    confirmation_sent_at: string | null;
+    email_confirmed_at: string | null;
+    identities: unknown[];
+  } | null;
+  needsEmailConfirmation: boolean;
+  existingAccount: boolean;
+  alreadyConfirmed: boolean;
+};
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -21,6 +33,8 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
   const signUpWithFallback = useCallback(
@@ -60,10 +74,16 @@ export default function RegisterPage() {
                   confirmation_sent_at: payload.needsEmailConfirmation
                     ? new Date().toISOString()
                     : null,
+                  email_confirmed_at: payload.alreadyConfirmed
+                    ? new Date().toISOString()
+                    : null,
+                  identities: [],
                 }
               : null,
             needsEmailConfirmation: Boolean(payload.needsEmailConfirmation),
-          },
+            existingAccount: Boolean(payload.existingAccount),
+            alreadyConfirmed: Boolean(payload.alreadyConfirmed),
+          } as SignUpResult,
           error: null,
           usedServerFallback: true,
         };
@@ -82,6 +102,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
     setSuccess(false);
+    setResendMessage('');
     setLoading(true);
 
     try {
@@ -101,10 +122,18 @@ export default function RegisterPage() {
       const confirmationRequired = Boolean(
         data?.needsEmailConfirmation || data?.user?.confirmation_sent_at
       );
+      const alreadyConfirmed = Boolean(data?.alreadyConfirmed || data?.user?.email_confirmed_at);
+      const existingAccount = Boolean(data?.existingAccount);
 
       if (confirmationRequired) {
         setNeedsEmailConfirmation(true);
         setSuccess(true);
+        setLoading(false);
+        return;
+      }
+
+      if (existingAccount && alreadyConfirmed) {
+        setError('This email is already registered and confirmed. Please sign in directly.');
         setLoading(false);
         return;
       }
@@ -119,6 +148,35 @@ export default function RegisterPage() {
       setLoading(false);
     }
   }, [email, password, fullName, router, signUpWithFallback]);
+
+  const handleResendConfirmation = useCallback(async () => {
+    if (!email) return;
+
+    setResendLoading(true);
+    setResendMessage('');
+    try {
+      const response = await fetch('/api/auth/resend-confirmation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok || !payload.ok) {
+        setResendMessage(payload.message || 'Failed to resend confirmation email. Please try again.');
+        setResendLoading(false);
+        return;
+      }
+
+      setResendMessage('Confirmation email resent. Please check inbox/spam.');
+      setResendLoading(false);
+    } catch {
+      setResendMessage('Network error while resending. Please try again.');
+      setResendLoading(false);
+    }
+  }, [email]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
@@ -139,12 +197,16 @@ export default function RegisterPage() {
                 <p className="text-sm text-muted-foreground text-center">
                   Didn&apos;t receive the email?{' '}
                   <button
-                    onClick={() => setSuccess(false)}
+                    onClick={handleResendConfirmation}
                     className="text-primary hover:underline"
+                    disabled={resendLoading}
                   >
-                    Try again
+                    {resendLoading ? 'Resending...' : 'Resend email'}
                   </button>
                 </p>
+                {resendMessage && (
+                  <p className="text-sm text-muted-foreground text-center">{resendMessage}</p>
+                )}
               </>
             ) : (
               <div className="rounded-md bg-green-500/10 p-4 text-sm text-green-500">
