@@ -52,6 +52,12 @@ function normalizeHttpStatus(status: unknown, fallback = 500): number {
   return status;
 }
 
+function parseTimestampMs(value: unknown): number | null {
+  if (typeof value !== 'string') return null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : null;
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as RegisterBody;
@@ -107,10 +113,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const isLikelyExistingUser = Boolean(
+    const alreadyConfirmed = Boolean(data?.user?.email_confirmed_at);
+    const userCreatedAtMs = parseTimestampMs(data?.user?.created_at);
+    const isLikelyExistingUserByAge =
+      userCreatedAtMs !== null && Date.now() - userCreatedAtMs > 5 * 60 * 1000;
+    const isLikelyExistingUserByIdentity = Boolean(
       data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0
     );
-    const alreadyConfirmed = Boolean(data?.user?.email_confirmed_at);
+    const isLikelyExistingUser = isLikelyExistingUserByAge || isLikelyExistingUserByIdentity;
 
     if (isLikelyExistingUser && !alreadyConfirmed) {
       const { error: resendError } = await supabase.auth.resend({
@@ -188,7 +198,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       userId: data?.user?.id ?? null,
-      needsEmailConfirmation: Boolean(data?.user?.confirmation_sent_at) || isLikelyExistingUser,
+      needsEmailConfirmation: !alreadyConfirmed,
       existingAccount: isLikelyExistingUser,
       alreadyConfirmed,
     });
