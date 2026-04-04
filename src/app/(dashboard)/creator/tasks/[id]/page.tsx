@@ -20,6 +20,7 @@ const platformOptions = [
   "YouTube",
   "Twitter",
   "Facebook",
+  "Google",
   "小红书",
   "抖音",
   "B站",

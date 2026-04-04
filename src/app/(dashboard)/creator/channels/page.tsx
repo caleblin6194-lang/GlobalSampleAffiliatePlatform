@@ -16,7 +16,15 @@ type Channel = {
   followers: number;
 };
 
-const PLATFORM_OPTIONS = ['TikTok', 'Instagram', 'YouTube', 'Xiaohongshu', 'Other'];
+const PLATFORM_OPTIONS = [
+  'TikTok',
+  'Instagram',
+  'YouTube',
+  'Facebook',
+  'Google',
+  'Xiaohongshu',
+  'Other',
+];
 
 function normalizeChannels(input: unknown): Channel[] {
   if (!Array.isArray(input)) return [];

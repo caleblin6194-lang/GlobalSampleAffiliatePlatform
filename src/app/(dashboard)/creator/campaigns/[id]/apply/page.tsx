@@ -141,6 +141,7 @@ export default function ApplyCampaignPage() {
                 <option value="YouTube">YouTube</option>
                 <option value="Twitter">Twitter</option>
                 <option value="Facebook">Facebook</option>
+                <option value="Google">Google</option>
                 <option value="小红书">小红书</option>
                 <option value="抖音">抖音</option>
                 <option value="Other">Other</option>
