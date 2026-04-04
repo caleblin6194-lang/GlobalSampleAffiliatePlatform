@@ -138,6 +138,14 @@ export default function RegisterPage() {
         return;
       }
 
+      if (existingAccount && !alreadyConfirmed) {
+        setNeedsEmailConfirmation(true);
+        setSuccess(true);
+        setResendMessage('This email is already registered but not confirmed. You can resend the confirmation email.');
+        setLoading(false);
+        return;
+      }
+
       // If confirmation is not required, allow the user to sign in directly.
       router.push('/login?registered=true');
       setLoading(false);
@@ -281,6 +289,21 @@ export default function RegisterPage() {
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? 'Creating account...' : 'Create Account'}
               </Button>
+              <div className="w-full rounded-md border p-3 text-sm">
+                <p className="mb-2 text-muted-foreground">Didn&apos;t receive confirmation email?</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleResendConfirmation}
+                  disabled={resendLoading || !email}
+                >
+                  {resendLoading ? 'Resending...' : 'Resend Confirmation Email'}
+                </Button>
+                {resendMessage && (
+                  <p className="mt-2 text-center text-xs text-muted-foreground">{resendMessage}</p>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground text-center">
                 Already have an account?{' '}
                 <Link href="/login" className="text-primary hover:underline">
