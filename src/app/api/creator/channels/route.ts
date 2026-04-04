@@ -68,34 +68,53 @@ async function ensureProfileExists(
     return { ok: true };
   }
 
-  const adminClient = createAdminClient();
-  if (!adminClient) {
-    return {
-      ok: false,
-      status: 500,
-      message:
-        'Profile is missing. Configure SUPABASE_SERVICE_ROLE_KEY in Vercel so the server can auto-create profiles, then redeploy.',
-    };
-  }
-
   const email = user.email ?? `${user.id}@missing-email.local`;
   const fullName = getUserFullName(user) || null;
+  const profilePayload = {
+    id: user.id,
+    email,
+    full_name: fullName,
+    role: 'creator',
+  };
 
-  const { error: upsertError } = await adminClient.from('profiles').upsert(
+  const adminClient = createAdminClient();
+  if (adminClient) {
+    const { error: upsertError } = await adminClient.from('profiles').upsert(
+      profilePayload,
+      { onConflict: 'id' }
+    );
+
+    if (!upsertError) {
+      return { ok: true };
+    }
+
+    // Continue to authenticated fallback so projects without a valid service key can still
+    // recover once INSERT policy on profiles exists.
+    console.error('Admin profile upsert failed in creator channels:', upsertError);
+  }
+
+  const { error: fallbackError } = await supabase.from('profiles').upsert(
     {
-      id: user.id,
-      email,
-      full_name: fullName,
-      role: 'creator',
+      ...profilePayload,
     },
     { onConflict: 'id' }
   );
 
-  if (upsertError) {
+  if (fallbackError) {
+    const msg = fallbackError.message.toLowerCase();
+    if (msg.includes('row-level security')) {
+      return {
+        ok: false,
+        status: 500,
+        message:
+          'Failed to create profile due to profiles table RLS. Fix either by setting a valid SUPABASE_SERVICE_ROLE_KEY (service_role key) in Vercel, or by adding INSERT policy: CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT TO authenticated WITH CHECK (auth.uid() = id);',
+      };
+    }
+
     return {
       ok: false,
       status: 500,
-      message: `Failed to create profile: ${upsertError.message}`,
+      message: `Failed to create profile: ${fallbackError.message}`,
     };
   }
 

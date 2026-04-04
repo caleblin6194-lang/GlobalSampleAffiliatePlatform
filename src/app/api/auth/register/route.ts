@@ -107,20 +107,30 @@ export async function POST(request: Request) {
           .from('profiles')
           .upsert(profilePayload, { onConflict: 'id' });
 
-        if (profileError) {
-          console.error('Profile upsert warning:', profileError);
+        if (!profileError) {
+          return NextResponse.json({
+            ok: true,
+            userId: data?.user?.id ?? null,
+            needsEmailConfirmation: Boolean(data?.user?.confirmation_sent_at),
+          });
         }
-      } else {
-        const { error: profileError } = await supabase.from('profiles').insert(profilePayload);
 
-        if (profileError) {
-          // Fallback insert may fail when RLS blocks anonymous inserts.
-          // Do not fail signup in this case.
-          console.error(
-            'Profile creation warning: fallback insert failed (likely RLS) and SUPABASE_SERVICE_ROLE_KEY is missing.',
-            profileError
-          );
-        }
+        console.error('Profile upsert warning:', profileError);
+      } else {
+        console.error(
+          'Profile creation warning: SUPABASE_SERVICE_ROLE_KEY is missing, trying authenticated fallback.'
+        );
+      }
+
+      const { error: fallbackProfileError } = await supabase
+        .from('profiles')
+        .upsert(profilePayload, { onConflict: 'id' });
+
+      if (fallbackProfileError) {
+        console.error(
+          'Profile creation warning: fallback upsert failed (likely profiles RLS INSERT policy missing or invalid service key).',
+          fallbackProfileError
+        );
       }
     }
 
