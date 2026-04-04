@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,12 +13,14 @@ const VALID_ROLES = ['creator', 'merchant', 'vendor', 'buyer'] as const;
 type Role = typeof VALID_ROLES[number];
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<Role>('creator');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const signUpWithFallback = useCallback(
@@ -95,21 +98,27 @@ export default function RegisterPage() {
       }
 
       // Check if user was created successfully
-      if (data?.user || data?.needsEmailConfirmation) {
+      const confirmationRequired = Boolean(
+        data?.needsEmailConfirmation || data?.user?.confirmation_sent_at
+      );
+
+      if (confirmationRequired) {
+        setNeedsEmailConfirmation(true);
         setSuccess(true);
         setLoading(false);
         return;
-      } else {
-        // User might need email confirmation
-        setSuccess(true);
-        setLoading(false);
       }
+
+      // If confirmation is not required, allow the user to sign in directly.
+      router.push('/login?registered=true');
+      setLoading(false);
+      return;
     } catch (err: any) {
       console.error('Registration error:', err);
       setError(err.message || 'An unexpected error occurred. Please try again.');
       setLoading(false);
     }
-  }, [email, password, fullName, signUpWithFallback]);
+  }, [email, password, fullName, router, signUpWithFallback]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
@@ -121,19 +130,28 @@ export default function RegisterPage() {
         
         {success ? (
           <CardContent className="space-y-4">
-            <div className="rounded-md bg-green-500/10 p-4 text-sm text-green-500">
-              <p className="font-medium mb-1">Check your email!</p>
-              <p>We&apos;ve sent a confirmation link to <strong>{email}</strong>. Please click the link to activate your account.</p>
-            </div>
-            <p className="text-sm text-muted-foreground text-center">
-              Didn&apos;t receive the email?{' '}
-              <button 
-                onClick={() => setSuccess(false)} 
-                className="text-primary hover:underline"
-              >
-                Try again
-              </button>
-            </p>
+            {needsEmailConfirmation ? (
+              <>
+                <div className="rounded-md bg-green-500/10 p-4 text-sm text-green-500">
+                  <p className="font-medium mb-1">Check your email!</p>
+                  <p>We&apos;ve sent a confirmation link to <strong>{email}</strong>. Please click the link to activate your account.</p>
+                </div>
+                <p className="text-sm text-muted-foreground text-center">
+                  Didn&apos;t receive the email?{' '}
+                  <button
+                    onClick={() => setSuccess(false)}
+                    className="text-primary hover:underline"
+                  >
+                    Try again
+                  </button>
+                </p>
+              </>
+            ) : (
+              <div className="rounded-md bg-green-500/10 p-4 text-sm text-green-500">
+                <p className="font-medium mb-1">Account created successfully.</p>
+                <p>You can sign in now.</p>
+              </div>
+            )}
             <p className="text-sm text-muted-foreground text-center">
               Already confirmed?{' '}
               <Link href="/login" className="text-primary hover:underline">
