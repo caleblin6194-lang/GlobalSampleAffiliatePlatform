@@ -12,6 +12,20 @@ type RegisterBody = {
   role?: unknown;
 };
 
+function resolveEmailRedirectTo(request: Request): string {
+  const site = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (site) {
+    try {
+      return new URL('/auth/callback', site).toString();
+    } catch {
+      // Fall through to request origin.
+    }
+  }
+
+  const requestUrl = new URL(request.url);
+  return new URL('/auth/callback', requestUrl.origin).toString();
+}
+
 function sanitizeText(value: unknown): string {
   if (typeof value !== 'string') return '';
   return value.trim();
@@ -98,6 +112,38 @@ export async function POST(request: Request) {
     );
     const alreadyConfirmed = Boolean(data?.user?.email_confirmed_at);
 
+    if (isLikelyExistingUser && !alreadyConfirmed) {
+      const { error: resendError } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: {
+          emailRedirectTo: resolveEmailRedirectTo(request),
+        },
+      });
+
+      if (resendError) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message: `Account exists but confirmation resend failed: ${resendError.message}`,
+            code: resendError.code ?? 'resend_failed',
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (isLikelyExistingUser && alreadyConfirmed) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: 'This email is already registered and confirmed. Please sign in.',
+          code: 'account_already_confirmed',
+        },
+        { status: 409 }
+      );
+    }
+
     if (data?.user?.id && !isLikelyExistingUser) {
       const profilePayload = {
         id: data.user.id,
@@ -142,7 +188,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       userId: data?.user?.id ?? null,
-      needsEmailConfirmation: Boolean(data?.user?.confirmation_sent_at),
+      needsEmailConfirmation: Boolean(data?.user?.confirmation_sent_at) || isLikelyExistingUser,
       existingAccount: isLikelyExistingUser,
       alreadyConfirmed,
     });
