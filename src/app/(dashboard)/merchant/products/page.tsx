@@ -21,9 +21,14 @@ export default async function MerchantProductsPage() {
           <h1 className="text-3xl font-bold">Products</h1>
           <p className="text-muted-foreground">Manage your product catalog</p>
         </div>
-        <Link href="/merchant/products/new">
-          <Button>+ Add Product</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/merchant/products/bulk">
+            <Button variant="outline">批量导入/导出</Button>
+          </Link>
+          <Link href="/merchant/products/new">
+            <Button>+ Add Product</Button>
+          </Link>
+        </div>
       </div>
 
       {(!products || products.length === 0) ? (
