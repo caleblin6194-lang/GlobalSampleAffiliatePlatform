@@ -25,6 +25,17 @@ type ProductForm = {
   status: 'active' | 'inactive';
 };
 
+type ExtractDetailsResponse = {
+  ok?: boolean;
+  message?: string;
+  details?: {
+    title?: string;
+    description?: string;
+    category?: string;
+    image_url?: string;
+  };
+};
+
 function normalizeStatus(value: unknown): 'active' | 'inactive' {
   return value === 'inactive' ? 'inactive' : 'active';
 }
@@ -53,6 +64,7 @@ export default function MerchantProductDetailPage() {
   const [variants, setVariants] = useState<Variant[]>([emptyVariant()]);
   const [originalVariantIds, setOriginalVariantIds] = useState<string[]>([]);
   const [supportsImageUrl, setSupportsImageUrl] = useState(true);
+  const [fetchingDetails, setFetchingDetails] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -148,6 +160,47 @@ export default function MerchantProductDetailPage() {
       const next = prev.filter((_, idx) => idx !== index);
       return next.length > 0 ? next : [emptyVariant()];
     });
+  };
+
+  const handleExtractDetails = async () => {
+    const sourceUrl = product.image_url.trim();
+    if (!sourceUrl) {
+      setError('请先输入图片或商品链接。');
+      return;
+    }
+
+    setFetchingDetails(true);
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch('/api/merchant/products/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: sourceUrl }),
+      });
+      const result = (await response.json().catch(() => ({}))) as ExtractDetailsResponse;
+
+      if (!response.ok || !result.ok) {
+        setError(result.message || '抓取详情失败，请检查链接是否可访问。');
+        setFetchingDetails(false);
+        return;
+      }
+
+      const details = result.details ?? {};
+      setProduct((prev) => ({
+        ...prev,
+        title: prev.title.trim() || (details.title ?? ''),
+        description: prev.description.trim() || (details.description ?? ''),
+        category: prev.category.trim() || (details.category ?? ''),
+        image_url: details.image_url || prev.image_url,
+      }));
+      setMessage('已抓取详情，空白字段已自动填充。');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : '抓取详情失败。');
+    } finally {
+      setFetchingDetails(false);
+    }
   };
 
   const handleSave = async () => {
@@ -340,17 +393,29 @@ export default function MerchantProductDetailPage() {
             </div>
             <div className="space-y-2">
               <Label>主图链接</Label>
-              <Input
-                value={product.image_url}
-                onChange={(e) => setProduct((prev) => ({ ...prev, image_url: e.target.value }))}
-                placeholder="https://..."
-                disabled={!supportsImageUrl}
-              />
+              <div className="flex flex-col gap-2 md:flex-row">
+                <Input
+                  value={product.image_url}
+                  onChange={(e) => setProduct((prev) => ({ ...prev, image_url: e.target.value }))}
+                  placeholder="https://..."
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleExtractDetails}
+                  disabled={!product.image_url.trim() || fetchingDetails}
+                >
+                  {fetchingDetails ? '抓取中...' : '自动抓取详情'}
+                </Button>
+              </div>
               {!supportsImageUrl && (
                 <p className="text-xs text-muted-foreground">
                   当前数据库尚未添加 image_url 字段，图片链接暂不保存。
                 </p>
               )}
+              <p className="text-xs text-muted-foreground">
+                输入商品详情页链接或图片链接，自动补全标题/描述/类目/主图。
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-3">

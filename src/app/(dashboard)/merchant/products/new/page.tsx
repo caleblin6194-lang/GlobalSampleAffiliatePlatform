@@ -9,11 +9,35 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
+type Variant = { model: string; color: string; series: string };
+type ProductForm = { title: string; description: string; category: string; image_url: string };
+
+type ExtractDetailsResponse = {
+  ok?: boolean;
+  message?: string;
+  details?: {
+    title?: string;
+    description?: string;
+    category?: string;
+    image_url?: string;
+  };
+};
+
 export default function NewProductPage() {
   const router = useRouter();
   const supabase = createClient();
   const [loading, setLoading] = useState(false);
-  const [variants, setVariants] = useState([{ model: '', color: '', series: '' }]);
+  const [fetchingDetails, setFetchingDetails] = useState(false);
+  const [supportsImageUrl, setSupportsImageUrl] = useState(true);
+  const [formError, setFormError] = useState('');
+  const [fetchMessage, setFetchMessage] = useState('');
+  const [productForm, setProductForm] = useState<ProductForm>({
+    title: '',
+    description: '',
+    category: '',
+    image_url: '',
+  });
+  const [variants, setVariants] = useState<Variant[]>([{ model: '', color: '', series: '' }]);
 
   const addVariant = () => setVariants([...variants, { model: '', color: '', series: '' }]);
   const updateVariant = (i: number, field: string, value: string) => {
@@ -23,20 +47,66 @@ export default function NewProductPage() {
   };
   const removeVariant = (i: number) => setVariants(variants.filter((_, idx) => idx !== i));
 
+  const handleExtractDetails = async () => {
+    const sourceUrl = productForm.image_url.trim();
+    if (!sourceUrl) return;
+
+    setFetchingDetails(true);
+    setFormError('');
+    setFetchMessage('');
+
+    try {
+      const response = await fetch('/api/merchant/products/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: sourceUrl }),
+      });
+      const result = (await response.json().catch(() => ({}))) as ExtractDetailsResponse;
+
+      if (!response.ok || !result.ok) {
+        setFormError(result.message || '抓取详情失败，请检查链接是否可访问。');
+        setFetchingDetails(false);
+        return;
+      }
+
+      const details = result.details ?? {};
+      setProductForm((prev) => ({
+        title: prev.title.trim() || (details.title ?? ''),
+        description: prev.description.trim() || (details.description ?? ''),
+        category: prev.category.trim() || (details.category ?? ''),
+        image_url: details.image_url || prev.image_url,
+      }));
+      setFetchMessage('已抓取详情，空白字段已自动填充。');
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : '抓取详情失败。');
+    } finally {
+      setFetchingDetails(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const form = e.target as HTMLFormElement;
-    const fd = new FormData(form);
+    setFormError('');
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push('/login'); return; }
+    if (!user) {
+      router.push('/login');
+      setLoading(false);
+      return;
+    }
+
+    if (!productForm.title.trim() || !productForm.category.trim()) {
+      setFormError('请填写商品标题和类目。');
+      setLoading(false);
+      return;
+    }
 
     const basePayload = {
       merchant_id: user.id,
-      title: fd.get('title') as string,
-      description: fd.get('description') as string,
-      category: fd.get('category') as string,
+      title: productForm.title.trim(),
+      description: productForm.description.trim() || null,
+      category: productForm.category.trim(),
       status: 'active',
     };
 
@@ -45,12 +115,13 @@ export default function NewProductPage() {
       .from('products')
       .insert({
         ...basePayload,
-        image_url: (fd.get('image_url') as string) || null,
+        image_url: productForm.image_url.trim() || null,
       })
       .select()
       .single();
 
     if (prodErr && isMissingProductsImageUrlColumn(prodErr)) {
+      setSupportsImageUrl(false);
       const retry = await supabase
         .from('products')
         .insert(basePayload)
@@ -61,7 +132,7 @@ export default function NewProductPage() {
     }
 
     if (prodErr || !product) {
-      alert('Failed to create product: ' + (prodErr?.message || 'Unknown error'));
+      setFormError('Failed to create product: ' + (prodErr?.message || 'Unknown error'));
       setLoading(false);
       return;
     }
@@ -80,14 +151,71 @@ export default function NewProductPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <h1 className="text-3xl font-bold">Add New Product</h1>
+      {formError && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{formError}</div>}
+      {fetchMessage && <div className="rounded-md bg-green-100 p-3 text-sm text-green-700">{fetchMessage}</div>}
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
           <CardHeader><CardTitle>Product Details</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <div><Label>Product Title *</Label><Input name="title" required placeholder="e.g. iPhone 15 Pro Case" /></div>
-            <div><Label>Description</Label><textarea name="description" className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm" rows={3} placeholder="Product description..." /></div>
-            <div><Label>Category *</Label><Input name="category" required placeholder="e.g. Electronics" /></div>
-            <div><Label>Image URL</Label><Input name="image_url" type="url" placeholder="https://..." /></div>
+            <div>
+              <Label>Product Title *</Label>
+              <Input
+                name="title"
+                required
+                placeholder="e.g. iPhone 15 Pro Case"
+                value={productForm.title}
+                onChange={(e) => setProductForm((prev) => ({ ...prev, title: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <textarea
+                name="description"
+                className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                rows={3}
+                placeholder="Product description..."
+                value={productForm.description}
+                onChange={(e) => setProductForm((prev) => ({ ...prev, description: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>Category *</Label>
+              <Input
+                name="category"
+                required
+                placeholder="e.g. Electronics"
+                value={productForm.category}
+                onChange={(e) => setProductForm((prev) => ({ ...prev, category: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Image URL / Product URL</Label>
+              <div className="flex flex-col gap-2 md:flex-row">
+                <Input
+                  name="image_url"
+                  type="url"
+                  placeholder="https://..."
+                  value={productForm.image_url}
+                  onChange={(e) => setProductForm((prev) => ({ ...prev, image_url: e.target.value }))}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleExtractDetails}
+                  disabled={!productForm.image_url.trim() || fetchingDetails}
+                >
+                  {fetchingDetails ? '抓取中...' : '自动抓取详情'}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                输入商品详情链接或图片链接，自动补全标题/描述/类目/主图。
+              </p>
+              {!supportsImageUrl && (
+                <p className="text-xs text-muted-foreground">
+                  当前数据库尚未添加 image_url 字段，图片链接暂不写入数据库。
+                </p>
+              )}
+            </div>
           </CardContent>
         </Card>
 
