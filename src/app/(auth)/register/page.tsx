@@ -56,10 +56,11 @@ export default function RegisterPage() {
         const payload = await response.json().catch(() => ({}));
 
         if (!response.ok || !payload.ok) {
+          const message = [payload.message, payload.hint].filter(Boolean).join(' ');
           return {
             data: null,
             error: {
-              message: payload.message || 'Registration failed.',
+              message: message || 'Registration failed.',
             },
             usedServerFallback: true,
           };
@@ -173,7 +174,8 @@ export default function RegisterPage() {
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok || !payload.ok) {
-        setResendMessage(payload.message || 'Failed to resend confirmation email. Please try again.');
+        const message = [payload.message, payload.hint].filter(Boolean).join(' ');
+        setResendMessage(message || 'Failed to resend confirmation email. Please try again.');
         setResendLoading(false);
         return;
       }
@@ -303,6 +305,12 @@ export default function RegisterPage() {
                 {resendMessage && (
                   <p className="mt-2 text-center text-xs text-muted-foreground">{resendMessage}</p>
                 )}
+                <p className="mt-2 text-center text-xs text-muted-foreground">
+                  Need diagnostics?{' '}
+                  <Link href="/api/auth/email-health" className="text-primary hover:underline">
+                    Open email health check
+                  </Link>
+                </p>
               </div>
               <p className="text-sm text-muted-foreground text-center">
                 Already have an account?{' '}

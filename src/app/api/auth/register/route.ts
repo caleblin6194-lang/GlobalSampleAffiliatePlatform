@@ -12,6 +12,21 @@ type RegisterBody = {
   role?: unknown;
 };
 
+type AuthEmailMode = 'confirm' | 'autoconfirm';
+
+function parseBooleanEnv(raw?: string): boolean {
+  if (!raw) return false;
+  const value = raw.trim().toLowerCase();
+  return value === '1' || value === 'true' || value === 'yes' || value === 'on';
+}
+
+function getAuthEmailMode(): AuthEmailMode {
+  const mode = (process.env.AUTH_EMAIL_MODE ?? '').trim().toLowerCase();
+  if (mode === 'autoconfirm') return 'autoconfirm';
+  if (parseBooleanEnv(process.env.AUTH_DISABLE_EMAIL_CONFIRMATION)) return 'autoconfirm';
+  return 'confirm';
+}
+
 function resolveEmailRedirectTo(request: Request): string {
   const site = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   if (site) {
@@ -52,6 +67,49 @@ function normalizeHttpStatus(status: unknown, fallback = 500): number {
   return status;
 }
 
+function classifyEmailDispatchError(error: { message: string; code?: string | null; status?: number }) {
+  const rawMessage = error.message || 'Failed to send confirmation email.';
+  const lower = rawMessage.toLowerCase();
+  const code = error.code ?? null;
+  const status = normalizeHttpStatus(error.status, 400);
+
+  if (lower.includes('rate') || lower.includes('too many')) {
+    return {
+      message: 'Confirmation email sent too frequently. Please wait and try again.',
+      code: code ?? 'email_rate_limited',
+      hint:
+        'If this repeats, configure custom SMTP in Supabase Auth and increase email rate limits.',
+      status,
+    };
+  }
+
+  if (lower.includes('smtp') || lower.includes('not authorized')) {
+    return {
+      message: 'Supabase email provider rejected this request.',
+      code: code ?? 'smtp_rejected',
+      hint: 'Configure custom SMTP in Supabase Auth > Email.',
+      status,
+    };
+  }
+
+  if (lower.includes('redirect') && lower.includes('url')) {
+    return {
+      message: 'Auth redirect URL is not allowed by Supabase settings.',
+      code: code ?? 'redirect_not_allowed',
+      hint:
+        'Add https://app.kolink.org/auth/callback and preview callback URLs in Supabase Auth redirect allow-list.',
+      status,
+    };
+  }
+
+  return {
+    message: rawMessage,
+    code,
+    hint: null,
+    status,
+  };
+}
+
 function parseTimestampMs(value: unknown): number | null {
   if (typeof value !== 'string') return null;
   const ms = Date.parse(value);
@@ -74,6 +132,7 @@ export async function POST(request: Request) {
     }
 
     const env = tryGetSupabaseClientEnv();
+    const authEmailMode = getAuthEmailMode();
     if (!env) {
       return NextResponse.json(
         {
@@ -81,6 +140,19 @@ export async function POST(request: Request) {
           message:
             'Supabase config is invalid on server. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel and redeploy.',
           code: 'supabase_env_invalid',
+        },
+        { status: 500 }
+      );
+    }
+
+    const adminClient = createAdminClient();
+    if (authEmailMode === 'autoconfirm' && !adminClient) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            'AUTH_EMAIL_MODE=autoconfirm requires SUPABASE_SERVICE_ROLE_KEY in Vercel. Add the key and redeploy.',
+          code: 'missing_service_role_key',
         },
         { status: 500 }
       );
@@ -113,7 +185,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const alreadyConfirmed = Boolean(data?.user?.email_confirmed_at);
+    let alreadyConfirmed = Boolean(data?.user?.email_confirmed_at);
     const userCreatedAtMs = parseTimestampMs(data?.user?.created_at);
     const isLikelyExistingUserByAge =
       userCreatedAtMs !== null && Date.now() - userCreatedAtMs > 5 * 60 * 1000;
@@ -123,23 +195,45 @@ export async function POST(request: Request) {
     const isLikelyExistingUser = isLikelyExistingUserByAge || isLikelyExistingUserByIdentity;
 
     if (isLikelyExistingUser && !alreadyConfirmed) {
-      const { error: resendError } = await supabase.auth.resend({
-        type: 'signup',
-        email,
-        options: {
-          emailRedirectTo: resolveEmailRedirectTo(request),
-        },
-      });
-
-      if (resendError) {
-        return NextResponse.json(
-          {
-            ok: false,
-            message: `Account exists but confirmation resend failed: ${resendError.message}`,
-            code: resendError.code ?? 'resend_failed',
-          },
-          { status: 400 }
+      if (authEmailMode === 'autoconfirm') {
+        const { error: confirmError } = await adminClient!.auth.admin.updateUserById(
+          data.user!.id,
+          { email_confirm: true }
         );
+
+        if (confirmError) {
+          return NextResponse.json(
+            {
+              ok: false,
+              message: `Account exists but auto-confirm failed: ${confirmError.message}`,
+              code: confirmError.code ?? 'auto_confirm_failed',
+            },
+            { status: 500 }
+          );
+        }
+
+        alreadyConfirmed = true;
+      } else {
+        const { error: resendError } = await supabase.auth.resend({
+          type: 'signup',
+          email,
+          options: {
+            emailRedirectTo: resolveEmailRedirectTo(request),
+          },
+        });
+
+        if (resendError) {
+          const detail = classifyEmailDispatchError(resendError);
+          return NextResponse.json(
+            {
+              ok: false,
+              message: `Account exists but confirmation resend failed: ${detail.message}`,
+              code: detail.code ?? 'resend_failed',
+              hint: detail.hint,
+            },
+            { status: detail.status }
+          );
+        }
       }
     }
 
@@ -155,6 +249,49 @@ export async function POST(request: Request) {
     }
 
     if (data?.user?.id && !isLikelyExistingUser) {
+      if (authEmailMode === 'autoconfirm' && !alreadyConfirmed) {
+        const { error: confirmError } = await adminClient!.auth.admin.updateUserById(
+          data.user.id,
+          { email_confirm: true }
+        );
+
+        if (confirmError) {
+          return NextResponse.json(
+            {
+              ok: false,
+              message: `Auto-confirm failed: ${confirmError.message}`,
+              code: confirmError.code ?? 'auto_confirm_failed',
+            },
+            { status: 500 }
+          );
+        }
+
+        alreadyConfirmed = true;
+      }
+
+      if (authEmailMode === 'confirm' && !alreadyConfirmed && !data.user.confirmation_sent_at) {
+        const { error: resendError } = await supabase.auth.resend({
+          type: 'signup',
+          email,
+          options: {
+            emailRedirectTo: resolveEmailRedirectTo(request),
+          },
+        });
+
+        if (resendError) {
+          const detail = classifyEmailDispatchError(resendError);
+          return NextResponse.json(
+            {
+              ok: false,
+              message: `Confirmation email was not dispatched: ${detail.message}`,
+              code: detail.code ?? 'confirmation_not_dispatched',
+              hint: detail.hint,
+            },
+            { status: detail.status }
+          );
+        }
+      }
+
       const profilePayload = {
         id: data.user.id,
         email,
@@ -162,7 +299,6 @@ export async function POST(request: Request) {
         role,
       };
 
-      const adminClient = createAdminClient();
       if (adminClient) {
         const { error: profileError } = await adminClient
           .from('profiles')
@@ -172,7 +308,10 @@ export async function POST(request: Request) {
           return NextResponse.json({
             ok: true,
             userId: data?.user?.id ?? null,
-            needsEmailConfirmation: Boolean(data?.user?.confirmation_sent_at),
+            needsEmailConfirmation: authEmailMode === 'confirm' && !alreadyConfirmed,
+            existingAccount: false,
+            alreadyConfirmed,
+            emailMode: authEmailMode,
           });
         }
 
@@ -198,9 +337,10 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       userId: data?.user?.id ?? null,
-      needsEmailConfirmation: !alreadyConfirmed,
+      needsEmailConfirmation: authEmailMode === 'confirm' && !alreadyConfirmed,
       existingAccount: isLikelyExistingUser,
       alreadyConfirmed,
+      emailMode: authEmailMode,
     });
   } catch (error) {
     const message = getErrorMessage(error);

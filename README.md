@@ -26,7 +26,26 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
+# Optional: confirm (default) or autoconfirm (skip email verification)
+AUTH_EMAIL_MODE=confirm
 ```
+
+### Email Verification Modes
+
+- `AUTH_EMAIL_MODE=confirm` (default): users must confirm email.
+- `AUTH_EMAIL_MODE=autoconfirm`: server auto-confirms users and does not depend on inbox delivery.
+  - Requires `SUPABASE_SERVICE_ROLE_KEY`.
+  - Use this mode when SMTP is not configured yet.
+
+### If confirmation emails are not arriving
+
+1. Configure custom SMTP in Supabase Dashboard: **Auth → Email**.
+2. Set **Site URL** to your production domain (for example `https://app.kolink.org`).
+3. Add redirect allow-list entries like:
+   - `https://app.kolink.org/auth/callback`
+   - `https://*.vercel.app/auth/callback`
+4. Verify runtime health:
+   - `GET /api/auth/email-health`
 
 ### 3. Setup Supabase Database
 
