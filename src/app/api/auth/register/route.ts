@@ -8,6 +8,7 @@ const VALID_ROLES = new Set(['creator', 'merchant', 'vendor', 'buyer']);
 type RegisterBody = {
   email?: unknown;
   password?: unknown;
+  confirmPassword?: unknown;
   fullName?: unknown;
   role?: unknown;
 };
@@ -121,12 +122,20 @@ export async function POST(request: Request) {
     const body = (await request.json()) as RegisterBody;
     const email = sanitizeText(body.email).toLowerCase();
     const password = sanitizeText(body.password);
+    const confirmPassword = sanitizeText(body.confirmPassword);
     const fullName = sanitizeText(body.fullName);
     const role = sanitizeRole(body.role);
 
     if (!email || !password) {
       return NextResponse.json(
         { ok: false, message: 'Email and password are required.' },
+        { status: 400 }
+      );
+    }
+
+    if (confirmPassword && password !== confirmPassword) {
+      return NextResponse.json(
+        { ok: false, message: 'Passwords do not match. Please enter the same password twice.' },
         { status: 400 }
       );
     }

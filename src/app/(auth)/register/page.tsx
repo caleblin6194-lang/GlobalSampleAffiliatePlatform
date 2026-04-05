@@ -28,6 +28,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<Role>('creator');
   const [error, setError] = useState('');
@@ -38,7 +39,12 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
 
   const signUpWithFallback = useCallback(
-    async (emailValue: string, passwordValue: string, nameValue: string) => {
+    async (
+      emailValue: string,
+      passwordValue: string,
+      confirmPasswordValue: string,
+      nameValue: string
+    ) => {
       try {
         const response = await fetch('/api/auth/register', {
           method: 'POST',
@@ -48,6 +54,7 @@ export default function RegisterPage() {
           body: JSON.stringify({
             email: emailValue,
             password: passwordValue,
+            confirmPassword: confirmPasswordValue,
             fullName: nameValue,
             role,
           }),
@@ -104,12 +111,19 @@ export default function RegisterPage() {
     setError('');
     setSuccess(false);
     setResendMessage('');
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match. Please enter the same password twice.');
+      return;
+    }
+
     setLoading(true);
 
     try {
       const { data, error: signUpError } = await signUpWithFallback(
         email,
         password,
+        confirmPassword,
         fullName
       );
 
@@ -156,7 +170,7 @@ export default function RegisterPage() {
       setError(err.message || 'An unexpected error occurred. Please try again.');
       setLoading(false);
     }
-  }, [email, password, fullName, router, signUpWithFallback]);
+  }, [confirmPassword, email, password, fullName, router, signUpWithFallback]);
 
   const handleResendConfirmation = useCallback(async () => {
     if (!email) return;
@@ -268,6 +282,17 @@ export default function RegisterPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   minLength={6}
                 />
