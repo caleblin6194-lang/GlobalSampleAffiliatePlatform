@@ -15,7 +15,6 @@ const ROLE_OPTIONS = ['creator', 'merchant', 'vendor', 'buyer'] as const;
 type Role = typeof ROLE_OPTIONS[number];
 type LoginRole = Role | 'auto';
 type ProfileRole = Role | 'admin';
-const LOGIN_ROLE_STORAGE_KEY = 'gsap.login.role';
 
 function isRole(value: string | null): value is Role {
   return value !== null && ROLE_OPTIONS.includes(value as Role);
@@ -45,13 +44,6 @@ export default function LoginPage() {
     const requestedRole = new URLSearchParams(window.location.search).get('role');
     if (isRole(requestedRole)) {
       setLoginRole(requestedRole);
-      window.localStorage.setItem(LOGIN_ROLE_STORAGE_KEY, requestedRole);
-      return;
-    }
-
-    const savedRole = window.localStorage.getItem(LOGIN_ROLE_STORAGE_KEY);
-    if (isRole(savedRole)) {
-      setLoginRole(savedRole);
     }
   }, []);
 
@@ -87,10 +79,6 @@ export default function LoginPage() {
         let targetRole: Role = currentRole ?? 'creator';
 
         if (loginRole !== 'auto') {
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem(LOGIN_ROLE_STORAGE_KEY, loginRole);
-          }
-
           if (currentRole !== loginRole) {
             const roleResponse = await fetch('/api/auth/role', {
               method: 'POST',
