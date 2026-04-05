@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { tryGetSupabaseClientEnv } from '@/lib/supabase/env';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createAdminClient, getServiceRoleKeyStatus } from '@/lib/supabase/admin';
 
 const VALID_ROLES = new Set(['creator', 'merchant', 'vendor', 'buyer']);
 
@@ -156,12 +156,22 @@ export async function POST(request: Request) {
 
     const adminClient = createAdminClient();
     if (authEmailMode === 'autoconfirm' && !adminClient) {
+      const keyStatus = getServiceRoleKeyStatus();
+      const message =
+        keyStatus.ok || keyStatus.issue === 'missing'
+          ? 'AUTH_EMAIL_MODE=autoconfirm requires SUPABASE_SERVICE_ROLE_KEY in Vercel. Add the key and redeploy.'
+          : keyStatus.issue === 'non_ascii'
+            ? 'SUPABASE_SERVICE_ROLE_KEY contains non-ASCII characters. Paste the raw service_role key from Supabase API Keys.'
+            : 'SUPABASE_SERVICE_ROLE_KEY format is invalid. Use service_role JWT or sb_secret_* key from Supabase.';
+
       return NextResponse.json(
         {
           ok: false,
-          message:
-            'AUTH_EMAIL_MODE=autoconfirm requires SUPABASE_SERVICE_ROLE_KEY in Vercel. Add the key and redeploy.',
-          code: 'missing_service_role_key',
+          message,
+          code:
+            keyStatus.ok || keyStatus.issue === 'missing'
+              ? 'missing_service_role_key'
+              : 'invalid_service_role_key',
         },
         { status: 500 }
       );

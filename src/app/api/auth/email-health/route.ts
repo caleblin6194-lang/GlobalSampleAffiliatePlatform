@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { tryGetSupabaseClientEnv } from '@/lib/supabase/env';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { getServiceRoleKeyStatus } from '@/lib/supabase/admin';
 
 type AuthEmailMode = 'confirm' | 'autoconfirm';
 
@@ -34,7 +34,8 @@ function resolveEmailRedirectTo(request: Request): string {
 export async function GET(request: Request) {
   const env = tryGetSupabaseClientEnv();
   const authEmailMode = getAuthEmailMode();
-  const hasServiceRole = Boolean(createAdminClient());
+  const serviceRoleStatus = getServiceRoleKeyStatus();
+  const hasServiceRole = serviceRoleStatus.ok;
 
   const hints: string[] = [];
   if (!env) {
@@ -44,7 +45,13 @@ export async function GET(request: Request) {
   }
 
   if (authEmailMode === 'autoconfirm' && !hasServiceRole) {
-    hints.push('AUTH_EMAIL_MODE=autoconfirm requires SUPABASE_SERVICE_ROLE_KEY.');
+    if (serviceRoleStatus.issue === 'non_ascii') {
+      hints.push('SUPABASE_SERVICE_ROLE_KEY contains non-ASCII characters. Paste the raw key from Supabase API Keys.');
+    } else if (serviceRoleStatus.issue === 'unexpected_format') {
+      hints.push('SUPABASE_SERVICE_ROLE_KEY format is invalid. Use service_role JWT or sb_secret_* key from Supabase.');
+    } else {
+      hints.push('AUTH_EMAIL_MODE=autoconfirm requires SUPABASE_SERVICE_ROLE_KEY.');
+    }
   }
 
   if (authEmailMode === 'confirm') {
@@ -58,6 +65,7 @@ export async function GET(request: Request) {
     authEmailMode,
     hasSupabaseClientEnv: Boolean(env),
     hasServiceRoleKey: hasServiceRole,
+    serviceRoleKeyIssue: hasServiceRole ? null : serviceRoleStatus.issue,
     emailRedirectTo: resolveEmailRedirectTo(request),
     hints,
   });
