@@ -8,8 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { useLanguage } from '@/components/i18n/language-provider';
 
 export default function LoginPage() {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -46,16 +48,16 @@ export default function LoginPage() {
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError('An unexpected error occurred. Please try again.');
+      setError(t('login.unexpectedError', 'An unexpected error occurred. Please try again.'));
       setLoading(false);
     }
-  }, [email, password, router]);
+  }, [email, password, router, t]);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Sign In</CardTitle>
-        <CardDescription>Enter your credentials to access your account</CardDescription>
+        <CardTitle>{t('login.title', 'Sign In')}</CardTitle>
+        <CardDescription>{t('login.description', 'Enter your credentials to access your account')}</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
@@ -65,21 +67,21 @@ export default function LoginPage() {
             </div>
           )}
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t('login.email', 'Email')}</Label>
             <Input id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t('login.password', 'Password')}</Label>
             <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? t('login.signingIn', 'Signing in...') : t('login.signIn', 'Sign In')}
           </Button>
           <p className="text-sm text-muted-foreground text-center">
-            No account?{' '}
-            <Link href="/register" className="text-primary hover:underline">Create one</Link>
+            {t('login.noAccount', 'No account?')}{' '}
+            <Link href="/register" className="text-primary hover:underline">{t('login.createOne', 'Create one')}</Link>
           </p>
         </CardFooter>
       </form>

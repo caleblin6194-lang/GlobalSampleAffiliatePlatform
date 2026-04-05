@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useLanguage } from '@/components/i18n/language-provider';
 
 const VALID_ROLES = ['creator', 'merchant', 'vendor', 'buyer'] as const;
 type Role = typeof VALID_ROLES[number];
@@ -25,6 +26,7 @@ type SignUpResult = {
 };
 
 export default function RegisterPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -67,7 +69,7 @@ export default function RegisterPage() {
           return {
             data: null,
             error: {
-              message: message || 'Registration failed.',
+              message: message || t('register.unexpectedError', 'An unexpected error occurred. Please try again.'),
             },
             usedServerFallback: true,
           };
@@ -98,12 +100,12 @@ export default function RegisterPage() {
       } catch {
         return {
           data: null,
-          error: { message: 'Network error while registering. Please try again.' },
+          error: { message: t('register.networkError', 'Network error while registering. Please try again.') },
           usedServerFallback: true,
         };
       }
     },
-    [role]
+    [role, t]
   );
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -113,7 +115,7 @@ export default function RegisterPage() {
     setResendMessage('');
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match. Please enter the same password twice.');
+      setError(t('register.passwordMismatch', 'Passwords do not match. Please enter the same password twice.'));
       return;
     }
 
@@ -148,7 +150,7 @@ export default function RegisterPage() {
       }
 
       if (existingAccount && alreadyConfirmed) {
-        setError('This email is already registered and confirmed. Please sign in directly.');
+        setError(t('register.alreadyRegisteredConfirmed', 'This email is already registered and confirmed. Please sign in directly.'));
         setLoading(false);
         return;
       }
@@ -156,7 +158,7 @@ export default function RegisterPage() {
       if (existingAccount && !alreadyConfirmed) {
         setNeedsEmailConfirmation(true);
         setSuccess(true);
-        setResendMessage('This email is already registered but not confirmed. You can resend the confirmation email.');
+        setResendMessage(t('register.alreadyRegisteredUnconfirmed', 'This email is already registered but not confirmed. You can resend the confirmation email.'));
         setLoading(false);
         return;
       }
@@ -167,10 +169,10 @@ export default function RegisterPage() {
       return;
     } catch (err: any) {
       console.error('Registration error:', err);
-      setError(err.message || 'An unexpected error occurred. Please try again.');
+      setError(err.message || t('register.unexpectedError', 'An unexpected error occurred. Please try again.'));
       setLoading(false);
     }
-  }, [confirmPassword, email, password, fullName, router, signUpWithFallback]);
+  }, [confirmPassword, email, password, fullName, router, signUpWithFallback, t]);
 
   const handleResendConfirmation = useCallback(async () => {
     if (!email) return;
@@ -189,25 +191,25 @@ export default function RegisterPage() {
 
       if (!response.ok || !payload.ok) {
         const message = [payload.message, payload.hint].filter(Boolean).join(' ');
-        setResendMessage(message || 'Failed to resend confirmation email. Please try again.');
+        setResendMessage(message || t('register.resendNetworkError', 'Network error while resending. Please try again.'));
         setResendLoading(false);
         return;
       }
 
-      setResendMessage('Confirmation email resent. Please check inbox/spam.');
+      setResendMessage(t('register.resendSuccess', 'Confirmation email resent. Please check inbox/spam.'));
       setResendLoading(false);
     } catch {
-      setResendMessage('Network error while resending. Please try again.');
+      setResendMessage(t('register.resendNetworkError', 'Network error while resending. Please try again.'));
       setResendLoading(false);
     }
-  }, [email]);
+  }, [email, t]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Create Account</CardTitle>
-          <CardDescription>Join the Global Sample Affiliate Platform</CardDescription>
+          <CardTitle>{t('register.title', 'Create Account')}</CardTitle>
+          <CardDescription>{t('register.description', 'Join the Global Sample Affiliate Platform')}</CardDescription>
         </CardHeader>
         
         {success ? (
@@ -215,17 +217,21 @@ export default function RegisterPage() {
             {needsEmailConfirmation ? (
               <>
                 <div className="rounded-md bg-green-500/10 p-4 text-sm text-green-500">
-                  <p className="font-medium mb-1">Check your email!</p>
-                  <p>We&apos;ve sent a confirmation link to <strong>{email}</strong>. Please click the link to activate your account.</p>
+                  <p className="font-medium mb-1">{t('register.checkEmailTitle', 'Check your email!')}</p>
+                  <p>
+                    {t('register.checkEmailBody', "We've sent a confirmation link to {email}. Please click the link to activate your account.").replace('{email}', email)}
+                  </p>
                 </div>
                 <p className="text-sm text-muted-foreground text-center">
-                  Didn&apos;t receive the email?{' '}
+                  {t('register.didNotReceiveEmail', "Didn't receive the email?")}{' '}
                   <button
                     onClick={handleResendConfirmation}
                     className="text-primary hover:underline"
                     disabled={resendLoading}
                   >
-                    {resendLoading ? 'Resending...' : 'Resend email'}
+                    {resendLoading
+                      ? t('register.resending', 'Resending...')
+                      : t('register.resendEmail', 'Resend email')}
                   </button>
                 </p>
                 {resendMessage && (
@@ -234,14 +240,14 @@ export default function RegisterPage() {
               </>
             ) : (
               <div className="rounded-md bg-green-500/10 p-4 text-sm text-green-500">
-                <p className="font-medium mb-1">Account created successfully.</p>
-                <p>You can sign in now.</p>
+                <p className="font-medium mb-1">{t('register.successTitle', 'Account created successfully.')}</p>
+                <p>{t('register.successBody', 'You can sign in now.')}</p>
               </div>
             )}
             <p className="text-sm text-muted-foreground text-center">
-              Already confirmed?{' '}
+              {t('register.alreadyConfirmed', 'Already confirmed?')}{' '}
               <Link href="/login" className="text-primary hover:underline">
-                Sign in
+                {t('register.signIn', 'Sign in')}
               </Link>
             </p>
           </CardContent>
@@ -254,7 +260,7 @@ export default function RegisterPage() {
                 </div>
               )}
               <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
+                <Label htmlFor="fullName">{t('register.fullName', 'Full Name')}</Label>
                 <Input
                   id="fullName"
                   type="text"
@@ -265,7 +271,7 @@ export default function RegisterPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t('register.email', 'Email')}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -276,7 +282,7 @@ export default function RegisterPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t('register.password', 'Password')}</Label>
                 <Input
                   id="password"
                   type="password"
@@ -287,7 +293,7 @@ export default function RegisterPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Label htmlFor="confirmPassword">{t('register.confirmPassword', 'Confirm Password')}</Label>
                 <Input
                   id="confirmPassword"
                   type="password"
@@ -298,26 +304,26 @@ export default function RegisterPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="role">Account Type</Label>
+                <Label htmlFor="role">{t('register.accountType', 'Account Type')}</Label>
                 <Select value={role} onValueChange={(val) => setRole(val as Role)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select account type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="buyer">Shop & Earn</SelectItem>
-                    <SelectItem value="creator">Content Creator</SelectItem>
-                    <SelectItem value="merchant">Brand Merchant</SelectItem>
-                    <SelectItem value="vendor">Supplier Vendor</SelectItem>
+                    <SelectItem value="buyer">{t('register.roleBuyer', 'Shop & Earn')}</SelectItem>
+                    <SelectItem value="creator">{t('register.roleCreator', 'Content Creator')}</SelectItem>
+                    <SelectItem value="merchant">{t('register.roleMerchant', 'Brand Merchant')}</SelectItem>
+                    <SelectItem value="vendor">{t('register.roleVendor', 'Supplier Vendor')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </CardContent>
             <CardFooter className="flex flex-col space-y-4">
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Creating account...' : 'Create Account'}
+                {loading ? t('register.creatingAccount', 'Creating account...') : t('register.createAccount', 'Create Account')}
               </Button>
               <div className="w-full rounded-md border p-3 text-sm">
-                <p className="mb-2 text-muted-foreground">Didn&apos;t receive confirmation email?</p>
+                <p className="mb-2 text-muted-foreground">{t('register.didNotReceiveConfirmEmail', "Didn't receive confirmation email?")}</p>
                 <Button
                   type="button"
                   variant="outline"
@@ -325,22 +331,24 @@ export default function RegisterPage() {
                   onClick={handleResendConfirmation}
                   disabled={resendLoading || !email}
                 >
-                  {resendLoading ? 'Resending...' : 'Resend Confirmation Email'}
+                  {resendLoading
+                    ? t('register.resending', 'Resending...')
+                    : t('register.resendConfirmationEmail', 'Resend Confirmation Email')}
                 </Button>
                 {resendMessage && (
                   <p className="mt-2 text-center text-xs text-muted-foreground">{resendMessage}</p>
                 )}
                 <p className="mt-2 text-center text-xs text-muted-foreground">
-                  Need diagnostics?{' '}
+                  {t('register.needDiagnostics', 'Need diagnostics?')}{' '}
                   <Link href="/api/auth/email-health" className="text-primary hover:underline">
-                    Open email health check
+                    {t('register.openEmailHealthCheck', 'Open email health check')}
                   </Link>
                 </p>
               </div>
               <p className="text-sm text-muted-foreground text-center">
-                Already have an account?{' '}
+                {t('register.alreadyHaveAccount', 'Already have an account?')}{' '}
                 <Link href="/login" className="text-primary hover:underline">
-                  Sign in
+                  {t('register.signIn', 'Sign in')}
                 </Link>
               </p>
             </CardFooter>
