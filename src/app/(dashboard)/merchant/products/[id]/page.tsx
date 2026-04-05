@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { isMissingProductsImageUrlColumn } from '@/lib/supabase/products-image-compat';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -51,6 +52,7 @@ export default function MerchantProductDetailPage() {
   });
   const [variants, setVariants] = useState<Variant[]>([emptyVariant()]);
   const [originalVariantIds, setOriginalVariantIds] = useState<string[]>([]);
+  const [supportsImageUrl, setSupportsImageUrl] = useState(true);
 
   useEffect(() => {
     const load = async () => {
@@ -67,12 +69,27 @@ export default function MerchantProductDetailPage() {
         return;
       }
 
-      const { data: productData, error: productError } = await supabase
+      let productQuery = await supabase
         .from('products')
         .select('id, title, description, category, status, image_url')
         .eq('id', productId)
         .eq('merchant_id', user.id)
         .single();
+
+      if (productQuery.error && isMissingProductsImageUrlColumn(productQuery.error)) {
+        setSupportsImageUrl(false);
+        productQuery = await supabase
+          .from('products')
+          .select('id, title, description, category, status')
+          .eq('id', productId)
+          .eq('merchant_id', user.id)
+          .single();
+      } else {
+        setSupportsImageUrl(true);
+      }
+
+      const productData = productQuery.data;
+      const productError = productQuery.error;
 
       if (productError || !productData) {
         setError(productError?.message || '未找到该商品，或无权限访问。');
@@ -152,17 +169,33 @@ export default function MerchantProductDetailPage() {
       return;
     }
 
-    const { error: updateError } = await supabase
+    let updateResult = await supabase
       .from('products')
       .update({
         title: product.title.trim(),
         description: product.description.trim() || null,
         category: product.category.trim() || null,
-        image_url: product.image_url.trim() || null,
+        ...(supportsImageUrl ? { image_url: product.image_url.trim() || null } : {}),
         status: product.status,
       })
       .eq('id', productId)
       .eq('merchant_id', user.id);
+
+    if (updateResult.error && isMissingProductsImageUrlColumn(updateResult.error)) {
+      setSupportsImageUrl(false);
+      updateResult = await supabase
+        .from('products')
+        .update({
+          title: product.title.trim(),
+          description: product.description.trim() || null,
+          category: product.category.trim() || null,
+          status: product.status,
+        })
+        .eq('id', productId)
+        .eq('merchant_id', user.id);
+    }
+
+    const updateError = updateResult.error;
 
     if (updateError) {
       setError(updateError.message);
@@ -311,7 +344,13 @@ export default function MerchantProductDetailPage() {
                 value={product.image_url}
                 onChange={(e) => setProduct((prev) => ({ ...prev, image_url: e.target.value }))}
                 placeholder="https://..."
+                disabled={!supportsImageUrl}
               />
+              {!supportsImageUrl && (
+                <p className="text-xs text-muted-foreground">
+                  当前数据库尚未添加 image_url 字段，图片链接暂不保存。
+                </p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-3">

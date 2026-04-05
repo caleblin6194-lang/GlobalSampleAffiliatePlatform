@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { isMissingProductsImageUrlColumn } from '@/lib/supabase/products-image-compat';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,19 +32,33 @@ export default function NewProductPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.push('/login'); return; }
 
-    // Create product
-    const { data: product, error: prodErr } = await supabase
+    const basePayload = {
+      merchant_id: user.id,
+      title: fd.get('title') as string,
+      description: fd.get('description') as string,
+      category: fd.get('category') as string,
+      status: 'active',
+    };
+
+    // Create product (兼容旧库没有 image_url 字段的情况)
+    let { data: product, error: prodErr } = await supabase
       .from('products')
       .insert({
-        merchant_id: user.id,
-        title: fd.get('title') as string,
-        description: fd.get('description') as string,
-        category: fd.get('category') as string,
-        image_url: fd.get('image_url') as string || null,
-        status: 'active',
+        ...basePayload,
+        image_url: (fd.get('image_url') as string) || null,
       })
       .select()
       .single();
+
+    if (prodErr && isMissingProductsImageUrlColumn(prodErr)) {
+      const retry = await supabase
+        .from('products')
+        .insert(basePayload)
+        .select()
+        .single();
+      product = retry.data;
+      prodErr = retry.error;
+    }
 
     if (prodErr || !product) {
       alert('Failed to create product: ' + (prodErr?.message || 'Unknown error'));

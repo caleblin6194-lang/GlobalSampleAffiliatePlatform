@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { isMissingProductsImageUrlColumn } from '@/lib/supabase/products-image-compat';
 
 const SUPPORTED_PLATFORMS = ['taobao', 'jd', 'pinduoduo', 'douyin', 'xiaohongshu', 'kuaishou'] as const;
 type SupportedPlatform = (typeof SUPPORTED_PLATFORMS)[number];
@@ -197,11 +198,46 @@ export async function GET(request: Request) {
 
   const { supabase, user } = auth;
 
-  const { data: products, error: productsError } = await supabase
+  let supportsImageUrl = true;
+  const productsQueryWithImage = await supabase
     .from('products')
     .select('id, title, description, category, status, image_url, created_at')
     .eq('merchant_id', user.id)
     .order('created_at', { ascending: false });
+
+  let products = productsQueryWithImage.data as
+    | Array<{
+        id: string;
+        title: string | null;
+        description: string | null;
+        category: string | null;
+        status: string | null;
+        image_url?: string | null;
+        created_at: string | null;
+      }>
+    | null;
+  let productsError = productsQueryWithImage.error;
+
+  if (productsError && isMissingProductsImageUrlColumn(productsError)) {
+    supportsImageUrl = false;
+    const productsQueryWithoutImage = await supabase
+      .from('products')
+      .select('id, title, description, category, status, created_at')
+      .eq('merchant_id', user.id)
+      .order('created_at', { ascending: false });
+    products = productsQueryWithoutImage.data as
+      | Array<{
+          id: string;
+          title: string | null;
+          description: string | null;
+          category: string | null;
+          status: string | null;
+          image_url?: string | null;
+          created_at: string | null;
+        }>
+      | null;
+    productsError = productsQueryWithoutImage.error;
+  }
 
   if (productsError) {
     return NextResponse.json({ ok: false, message: productsError.message }, { status: 500 });
@@ -238,7 +274,7 @@ export async function GET(request: Request) {
       product.title ?? '',
       product.description ?? '',
       product.category ?? '',
-      (product as { image_url?: string | null }).image_url ?? '',
+      supportsImageUrl ? (product as { image_url?: string | null }).image_url ?? '' : '',
       normalizeStatus(product.status ?? 'active'),
     ];
 
@@ -287,6 +323,8 @@ export async function POST(request: Request) {
   let failedRows = 0;
   const errors: string[] = [];
 
+  let supportsImageUrl = true;
+
   for (let i = 0; i < rows.length; i += 1) {
     const row = rows[i];
     if (!row.title) {
@@ -309,37 +347,67 @@ export async function POST(request: Request) {
       let productId = existingProducts?.[0]?.id ?? null;
 
       if (productId) {
-        const { error: updateError } = await supabase
+        let updateResult = await supabase
           .from('products')
           .update({
             description: row.description || null,
             category: row.category || null,
-            image_url: row.imageUrl || null,
+            ...(supportsImageUrl ? { image_url: row.imageUrl || null } : {}),
             status: row.status,
           })
           .eq('id', productId)
           .eq('merchant_id', user.id);
-        if (updateError) {
-          throw new Error(updateError.message);
+
+        if (updateResult.error && supportsImageUrl && isMissingProductsImageUrlColumn(updateResult.error)) {
+          supportsImageUrl = false;
+          updateResult = await supabase
+            .from('products')
+            .update({
+              description: row.description || null,
+              category: row.category || null,
+              status: row.status,
+            })
+            .eq('id', productId)
+            .eq('merchant_id', user.id);
+        }
+
+        if (updateResult.error) {
+          throw new Error(updateResult.error.message);
         }
         updatedProducts += 1;
       } else {
-        const { data: insertedProduct, error: insertError } = await supabase
+        let insertResult = await supabase
           .from('products')
           .insert({
             merchant_id: user.id,
             title: row.title,
             description: row.description || null,
             category: row.category || null,
-            image_url: row.imageUrl || null,
+            ...(supportsImageUrl ? { image_url: row.imageUrl || null } : {}),
             status: row.status,
           })
           .select('id')
           .single();
-        if (insertError || !insertedProduct) {
-          throw new Error(insertError?.message || 'Failed to insert product.');
+
+        if (insertResult.error && supportsImageUrl && isMissingProductsImageUrlColumn(insertResult.error)) {
+          supportsImageUrl = false;
+          insertResult = await supabase
+            .from('products')
+            .insert({
+              merchant_id: user.id,
+              title: row.title,
+              description: row.description || null,
+              category: row.category || null,
+              status: row.status,
+            })
+            .select('id')
+            .single();
         }
-        productId = insertedProduct.id;
+
+        if (insertResult.error || !insertResult.data) {
+          throw new Error(insertResult.error?.message || 'Failed to insert product.');
+        }
+        productId = insertResult.data.id;
         createdProducts += 1;
       }
 
