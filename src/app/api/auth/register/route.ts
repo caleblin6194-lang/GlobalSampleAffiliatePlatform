@@ -177,6 +177,73 @@ export async function POST(request: Request) {
       );
     }
 
+    if (authEmailMode === 'autoconfirm') {
+      const { data: createdUserData, error: createUserError } = await adminClient!.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: fullName ? { full_name: fullName } : undefined,
+      });
+
+      if (createUserError) {
+        const lower = createUserError.message.toLowerCase();
+        const accountExists =
+          lower.includes('already') ||
+          lower.includes('duplicate') ||
+          lower.includes('registered') ||
+          createUserError.status === 422 ||
+          createUserError.code === 'user_already_exists';
+
+        if (accountExists) {
+          return NextResponse.json(
+            {
+              ok: false,
+              message: 'This email is already registered. Please sign in.',
+              code: 'account_already_exists',
+            },
+            { status: 409 }
+          );
+        }
+
+        const status = normalizeHttpStatus(createUserError.status, 400);
+        return NextResponse.json(
+          {
+            ok: false,
+            message: createUserError.message,
+            code: createUserError.code ?? 'create_user_failed',
+          },
+          { status }
+        );
+      }
+
+      const userId = createdUserData.user?.id ?? null;
+      if (userId) {
+        const profilePayload = {
+          id: userId,
+          email,
+          full_name: fullName || null,
+          role,
+        };
+
+        const { error: profileError } = await adminClient!
+          .from('profiles')
+          .upsert(profilePayload, { onConflict: 'id' });
+
+        if (profileError) {
+          console.error('Profile upsert warning:', profileError);
+        }
+      }
+
+      return NextResponse.json({
+        ok: true,
+        userId,
+        needsEmailConfirmation: false,
+        existingAccount: false,
+        alreadyConfirmed: true,
+        emailMode: authEmailMode,
+      });
+    }
+
     const { supabaseUrl, supabaseAnonKey } = env;
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
@@ -214,45 +281,25 @@ export async function POST(request: Request) {
     const isLikelyExistingUser = isLikelyExistingUserByAge || isLikelyExistingUserByIdentity;
 
     if (isLikelyExistingUser && !alreadyConfirmed) {
-      if (authEmailMode === 'autoconfirm') {
-        const { error: confirmError } = await adminClient!.auth.admin.updateUserById(
-          data.user!.id,
-          { email_confirm: true }
-        );
+      const { error: resendError } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: {
+          emailRedirectTo: resolveEmailRedirectTo(request),
+        },
+      });
 
-        if (confirmError) {
-          return NextResponse.json(
-            {
-              ok: false,
-              message: `Account exists but auto-confirm failed: ${confirmError.message}`,
-              code: confirmError.code ?? 'auto_confirm_failed',
-            },
-            { status: 500 }
-          );
-        }
-
-        alreadyConfirmed = true;
-      } else {
-        const { error: resendError } = await supabase.auth.resend({
-          type: 'signup',
-          email,
-          options: {
-            emailRedirectTo: resolveEmailRedirectTo(request),
+      if (resendError) {
+        const detail = classifyEmailDispatchError(resendError);
+        return NextResponse.json(
+          {
+            ok: false,
+            message: `Account exists but confirmation resend failed: ${detail.message}`,
+            code: detail.code ?? 'resend_failed',
+            hint: detail.hint,
           },
-        });
-
-        if (resendError) {
-          const detail = classifyEmailDispatchError(resendError);
-          return NextResponse.json(
-            {
-              ok: false,
-              message: `Account exists but confirmation resend failed: ${detail.message}`,
-              code: detail.code ?? 'resend_failed',
-              hint: detail.hint,
-            },
-            { status: detail.status }
-          );
-        }
+          { status: detail.status }
+        );
       }
     }
 
@@ -268,27 +315,7 @@ export async function POST(request: Request) {
     }
 
     if (data?.user?.id && !isLikelyExistingUser) {
-      if (authEmailMode === 'autoconfirm' && !alreadyConfirmed) {
-        const { error: confirmError } = await adminClient!.auth.admin.updateUserById(
-          data.user.id,
-          { email_confirm: true }
-        );
-
-        if (confirmError) {
-          return NextResponse.json(
-            {
-              ok: false,
-              message: `Auto-confirm failed: ${confirmError.message}`,
-              code: confirmError.code ?? 'auto_confirm_failed',
-            },
-            { status: 500 }
-          );
-        }
-
-        alreadyConfirmed = true;
-      }
-
-      if (authEmailMode === 'confirm' && !alreadyConfirmed && !data.user.confirmation_sent_at) {
+      if (!alreadyConfirmed && !data.user.confirmation_sent_at) {
         const { error: resendError } = await supabase.auth.resend({
           type: 'signup',
           email,
@@ -327,7 +354,7 @@ export async function POST(request: Request) {
           return NextResponse.json({
             ok: true,
             userId: data?.user?.id ?? null,
-            needsEmailConfirmation: authEmailMode === 'confirm' && !alreadyConfirmed,
+            needsEmailConfirmation: !alreadyConfirmed,
             existingAccount: false,
             alreadyConfirmed,
             emailMode: authEmailMode,
@@ -356,7 +383,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       userId: data?.user?.id ?? null,
-      needsEmailConfirmation: authEmailMode === 'confirm' && !alreadyConfirmed,
+      needsEmailConfirmation: !alreadyConfirmed,
       existingAccount: isLikelyExistingUser,
       alreadyConfirmed,
       emailMode: authEmailMode,
