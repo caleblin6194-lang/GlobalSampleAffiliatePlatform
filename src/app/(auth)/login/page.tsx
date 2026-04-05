@@ -13,7 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const ROLE_OPTIONS = ['creator', 'merchant', 'vendor', 'buyer'] as const;
 type Role = typeof ROLE_OPTIONS[number];
+type LoginRole = Role | 'auto';
 type ProfileRole = Role | 'admin';
+const LOGIN_ROLE_STORAGE_KEY = 'gsap.login.role';
 
 function isRole(value: string | null): value is Role {
   return value !== null && ROLE_OPTIONS.includes(value as Role);
@@ -33,7 +35,7 @@ export default function LoginPage() {
   const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loginRole, setLoginRole] = useState<Role>('creator');
+  const [loginRole, setLoginRole] = useState<LoginRole>('auto');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -43,6 +45,13 @@ export default function LoginPage() {
     const requestedRole = new URLSearchParams(window.location.search).get('role');
     if (isRole(requestedRole)) {
       setLoginRole(requestedRole);
+      window.localStorage.setItem(LOGIN_ROLE_STORAGE_KEY, requestedRole);
+      return;
+    }
+
+    const savedRole = window.localStorage.getItem(LOGIN_ROLE_STORAGE_KEY);
+    if (isRole(savedRole)) {
+      setLoginRole(savedRole);
     }
   }, []);
 
@@ -75,20 +84,35 @@ export default function LoginPage() {
           return;
         }
 
-        if (currentRole !== loginRole) {
-          const { error: roleUpdateError } = await supabase
-            .from('profiles')
-            .update({ role: loginRole })
-            .eq('id', data.user.id);
+        let targetRole: Role = currentRole ?? 'creator';
 
-          if (roleUpdateError) {
-            setError(roleUpdateError.message || t('login.roleSwitchFailed', 'Failed to switch role. Please try again.'));
-            setLoading(false);
-            return;
+        if (loginRole !== 'auto') {
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(LOGIN_ROLE_STORAGE_KEY, loginRole);
           }
+
+          if (currentRole !== loginRole) {
+            const roleResponse = await fetch('/api/auth/role', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ role: loginRole }),
+            });
+            const roleResult = (await roleResponse.json().catch(() => ({}))) as {
+              ok?: boolean;
+              message?: string;
+            };
+
+            if (!roleResponse.ok || !roleResult.ok) {
+              setError(roleResult.message || t('login.roleSwitchFailed', 'Failed to switch role. Please try again.'));
+              setLoading(false);
+              return;
+            }
+          }
+
+          targetRole = loginRole;
         }
 
-        router.push(`/${loginRole}/dashboard`);
+        router.push(`/${targetRole}/dashboard`);
       } else {
         router.push('/');
       }
@@ -122,17 +146,21 @@ export default function LoginPage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="loginRole">{t('login.loginAs', 'Login as')}</Label>
-            <Select value={loginRole} onValueChange={(value) => setLoginRole(value as Role)}>
+            <Select value={loginRole} onValueChange={(value) => setLoginRole(value as LoginRole)}>
               <SelectTrigger id="loginRole">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="auto">{t('login.autoRole', 'Auto (use account role)')}</SelectItem>
                 <SelectItem value="creator">{t('header.role.creator', 'Content Creator')}</SelectItem>
                 <SelectItem value="merchant">{t('header.role.merchant', 'Brand Merchant')}</SelectItem>
                 <SelectItem value="vendor">{t('header.role.vendor', 'Supplier Vendor')}</SelectItem>
                 <SelectItem value="buyer">{t('header.role.buyer', 'Buyer')}</SelectItem>
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">
+              {t('login.roleHint', 'Auto will keep your existing account role. Choose another role to switch.')}
+            </p>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-4">

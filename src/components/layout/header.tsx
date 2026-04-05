@@ -27,6 +27,7 @@ export function Header({ user, role }: HeaderProps) {
   const supabase = createClient();
   const { t } = useLanguage();
   const [switchingRole, setSwitchingRole] = useState(false);
+  const [switchError, setSwitchError] = useState('');
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -50,12 +51,17 @@ export function Header({ user, role }: HeaderProps) {
     }
 
     setSwitchingRole(true);
-    const { error } = await supabase
-      .from('profiles')
-      .update({ role: nextRole })
-      .eq('id', user.id);
+    setSwitchError('');
 
-    if (error) {
+    const response = await fetch('/api/auth/role', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: nextRole }),
+    });
+    const result = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string };
+
+    if (!response.ok || !result.ok) {
+      setSwitchError(result.message || t('header.roleSwitchFailed', 'Failed to switch role. Please try again.'));
       setSwitchingRole(false);
       return;
     }
@@ -91,6 +97,7 @@ export function Header({ user, role }: HeaderProps) {
               </Select>
             </div>
           )}
+          {switchError && <span className="text-xs text-destructive">{switchError}</span>}
         </div>
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon">
