@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -9,14 +9,42 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useLanguage } from '@/components/i18n/language-provider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const ROLE_OPTIONS = ['creator', 'merchant', 'vendor', 'buyer'] as const;
+type Role = typeof ROLE_OPTIONS[number];
+type ProfileRole = Role | 'admin';
+
+function isRole(value: string | null): value is Role {
+  return value !== null && ROLE_OPTIONS.includes(value as Role);
+}
+
+function isProfileRole(value: unknown): value is ProfileRole {
+  return (
+    value === 'admin' ||
+    value === 'creator' ||
+    value === 'merchant' ||
+    value === 'vendor' ||
+    value === 'buyer'
+  );
+}
 
 export default function LoginPage() {
   const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loginRole, setLoginRole] = useState<Role>('creator');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const requestedRole = new URLSearchParams(window.location.search).get('role');
+    if (isRole(requestedRole)) {
+      setLoginRole(requestedRole);
+    }
+  }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,8 +69,26 @@ export default function LoginPage() {
           .eq('id', data.user.id)
           .single();
 
-        const role = profile?.role || 'creator';
-        router.push(`/${role}/dashboard`);
+        const currentRole = isProfileRole(profile?.role) ? profile.role : null;
+        if (currentRole === 'admin') {
+          router.push('/admin/dashboard');
+          return;
+        }
+
+        if (currentRole !== loginRole) {
+          const { error: roleUpdateError } = await supabase
+            .from('profiles')
+            .update({ role: loginRole })
+            .eq('id', data.user.id);
+
+          if (roleUpdateError) {
+            setError(roleUpdateError.message || t('login.roleSwitchFailed', 'Failed to switch role. Please try again.'));
+            setLoading(false);
+            return;
+          }
+        }
+
+        router.push(`/${loginRole}/dashboard`);
       } else {
         router.push('/');
       }
@@ -51,7 +97,7 @@ export default function LoginPage() {
       setError(t('login.unexpectedError', 'An unexpected error occurred. Please try again.'));
       setLoading(false);
     }
-  }, [email, password, router, t]);
+  }, [email, loginRole, password, router, t]);
 
   return (
     <Card>
@@ -73,6 +119,20 @@ export default function LoginPage() {
           <div className="space-y-2">
             <Label htmlFor="password">{t('login.password', 'Password')}</Label>
             <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="loginRole">{t('login.loginAs', 'Login as')}</Label>
+            <Select value={loginRole} onValueChange={(value) => setLoginRole(value as Role)}>
+              <SelectTrigger id="loginRole">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="creator">{t('header.role.creator', 'Content Creator')}</SelectItem>
+                <SelectItem value="merchant">{t('header.role.merchant', 'Brand Merchant')}</SelectItem>
+                <SelectItem value="vendor">{t('header.role.vendor', 'Supplier Vendor')}</SelectItem>
+                <SelectItem value="buyer">{t('header.role.buyer', 'Buyer')}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-4">

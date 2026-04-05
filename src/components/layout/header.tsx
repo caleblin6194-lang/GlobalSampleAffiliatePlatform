@@ -14,9 +14,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Bell, LogOut, Settings, User } from "lucide-react";
 import { useLanguage } from "@/components/i18n/language-provider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState } from "react";
 
 interface HeaderProps {
-  user?: { email?: string; full_name?: string; avatar_url?: string };
+  user?: { id?: string; email?: string; full_name?: string; avatar_url?: string };
   role: string;
 }
 
@@ -24,6 +26,7 @@ export function Header({ user, role }: HeaderProps) {
   const router = useRouter();
   const supabase = createClient();
   const { t } = useLanguage();
+  const [switchingRole, setSwitchingRole] = useState(false);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -36,6 +39,30 @@ export function Header({ user, role }: HeaderProps) {
     merchant: t('header.role.merchant', 'Brand Merchant'),
     creator: t('header.role.creator', 'Content Creator'),
     vendor: t('header.role.vendor', 'Supplier Vendor'),
+    buyer: t('header.role.buyer', 'Buyer'),
+  };
+
+  const canSwitchRole = role !== 'admin';
+
+  const handleRoleChange = async (nextRole: string) => {
+    if (!user?.id || !canSwitchRole || nextRole === role) {
+      return;
+    }
+
+    setSwitchingRole(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role: nextRole })
+      .eq('id', user.id);
+
+    if (error) {
+      setSwitchingRole(false);
+      return;
+    }
+
+    router.push(`/${nextRole}/dashboard`);
+    router.refresh();
+    setSwitchingRole(false);
   };
 
   const initials = user?.full_name
@@ -49,6 +76,21 @@ export function Header({ user, role }: HeaderProps) {
           <span className="text-sm font-medium text-muted-foreground">
             {roleLabels[role] || role}
           </span>
+          {canSwitchRole && (
+            <div className="w-[170px]">
+              <Select value={role} onValueChange={handleRoleChange} disabled={switchingRole}>
+                <SelectTrigger className="h-8">
+                  <SelectValue placeholder={t('header.switchRole', 'Switch role')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="creator">{t('header.role.creator', 'Content Creator')}</SelectItem>
+                  <SelectItem value="merchant">{t('header.role.merchant', 'Brand Merchant')}</SelectItem>
+                  <SelectItem value="vendor">{t('header.role.vendor', 'Supplier Vendor')}</SelectItem>
+                  <SelectItem value="buyer">{t('header.role.buyer', 'Buyer')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon">

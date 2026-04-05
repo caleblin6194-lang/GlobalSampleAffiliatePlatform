@@ -24,7 +24,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <Sidebar role={role} />
       <div className="flex flex-1 flex-col">
         <Header
-          user={{ email: profile?.email, full_name: profile?.full_name, avatar_url: profile?.avatar_url }}
+          user={{ id: user.id, email: profile?.email, full_name: profile?.full_name, avatar_url: profile?.avatar_url }}
           role={role}
         />
         <main className="flex-1 p-4 md:p-6">{children}</main>

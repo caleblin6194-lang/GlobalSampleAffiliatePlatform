@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,14 @@ export default function RegisterPage() {
   const [resendLoading, setResendLoading] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const requestedRole = new URLSearchParams(window.location.search).get('role');
+    if (requestedRole && VALID_ROLES.includes(requestedRole as Role)) {
+      setRole(requestedRole as Role);
+    }
+  }, []);
 
   const signUpWithFallback = useCallback(
     async (
