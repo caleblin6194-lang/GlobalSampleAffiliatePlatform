@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+import { MerchantLocaleAssistant } from "@/components/layout/merchant-locale-assistant";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -27,7 +28,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
           user={{ id: user.id, email: profile?.email, full_name: profile?.full_name, avatar_url: profile?.avatar_url }}
           role={role}
         />
-        <main className="flex-1 p-4 md:p-6">{children}</main>
+        <MerchantLocaleAssistant />
+        <main id="dashboard-main-content" className="flex-1 p-4 md:p-6">{children}</main>
       </div>
     </div>
   );
