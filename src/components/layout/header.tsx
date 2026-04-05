@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -24,10 +24,20 @@ interface HeaderProps {
 
 export function Header({ user, role }: HeaderProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const supabase = createClient();
   const { t } = useLanguage();
   const [switchingRole, setSwitchingRole] = useState(false);
   const [switchError, setSwitchError] = useState('');
+
+  const roleFromPath = (() => {
+    const topSegment = pathname.split('/')[1];
+    if (topSegment === 'admin' || topSegment === 'merchant' || topSegment === 'creator' || topSegment === 'vendor' || topSegment === 'buyer') {
+      return topSegment;
+    }
+    return null;
+  })();
+  const effectiveRole = roleFromPath ?? role;
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -43,10 +53,10 @@ export function Header({ user, role }: HeaderProps) {
     buyer: t('header.role.buyer', 'Buyer'),
   };
 
-  const canSwitchRole = role !== 'admin';
+  const canSwitchRole = effectiveRole !== 'admin';
 
   const handleRoleChange = async (nextRole: string) => {
-    if (!user?.id || !canSwitchRole || nextRole === role) {
+    if (!user?.id || !canSwitchRole || nextRole === effectiveRole) {
       return;
     }
 
@@ -80,11 +90,11 @@ export function Header({ user, role }: HeaderProps) {
       <div className="flex h-16 items-center justify-between px-4 md:px-6">
         <div className="flex items-center gap-4">
           <span className="text-sm font-medium text-muted-foreground">
-            {roleLabels[role] || role}
+            {roleLabels[effectiveRole] || effectiveRole}
           </span>
           {canSwitchRole && (
             <div className="w-[170px]">
-              <Select value={role} onValueChange={handleRoleChange} disabled={switchingRole}>
+              <Select value={effectiveRole} onValueChange={handleRoleChange} disabled={switchingRole}>
                 <SelectTrigger className="h-8">
                   <SelectValue placeholder={t('header.switchRole', 'Switch role')} />
                 </SelectTrigger>

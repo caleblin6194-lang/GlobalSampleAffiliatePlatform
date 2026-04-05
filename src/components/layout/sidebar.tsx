@@ -63,7 +63,15 @@ interface SidebarProps {
 export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
   const { t } = useLanguage();
-  const navItems = roleNavItems[role] || roleNavItems.creator;
+  const roleFromPath = (() => {
+    const topSegment = pathname.split('/')[1];
+    if (topSegment && topSegment in roleNavItems) {
+      return topSegment;
+    }
+    return null;
+  })();
+  const effectiveRole = roleFromPath ?? role;
+  const navItems = roleNavItems[effectiveRole] || roleNavItems.creator;
 
   return (
     <>
